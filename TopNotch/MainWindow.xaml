@@ -170,7 +170,7 @@
                         <!-- Tab strip -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,6">
                             <Button x:Name="MediaTab" Content="Media" Style="{StaticResource TabButton}" Click="Tab_Click" Margin="6,0" />
-                            <Button x:Name="DeviceTab" Content="Devices" Style="{StaticResource TabButton}" Click="Tab_Click" Margin="6,0" />
+                            <Button x:Name="HistoryTab" Content="History" Style="{StaticResource TabButton}" Click="Tab_Click" Margin="6,0" />
                         </StackPanel>
 
                         <!-- Tab content container (clipped to prevent spill outside tab area) -->
@@ -181,81 +181,182 @@
                                 </Grid.RenderTransform>
 
                                 <!-- Media tab -->
-                                <Grid x:Name="MediaContent" Visibility="Collapsed">
+                                <Grid x:Name="MediaContent" Visibility="Visible">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="64" />
-                                        <!-- album art -->
-                                        <ColumnDefinition Width="*" />
-                                        <!-- everything else -->
+                                        <!-- Media part (~70%) -->
+                                        <ColumnDefinition Width="7*" />
+                                        <!-- Device part (~30%) -->
+                                        <ColumnDefinition Width="3*" />
                                     </Grid.ColumnDefinitions>
 
-                                    <Image x:Name="AlbumCover" HorizontalAlignment="Center" Height="50"
-                                   VerticalAlignment="Top" Width="50"
-                                   Source="/Sprites/Empty.png" RenderTransformOrigin="0.5,0.5">
-                                        <Image.Clip>
-                                            <RectangleGeometry Rect="0,0,50,50" RadiusX="15" RadiusY="15" />
-                                        </Image.Clip>
-                                    </Image>
+                                    <!-- Media part -->
+                                    <Grid Grid.Column="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="64" />
+                                            <!-- album art -->
+                                            <ColumnDefinition Width="*" />
+                                            <!-- everything else -->
+                                        </Grid.ColumnDefinitions>
 
-                                    <!-- Text container clipped to column bounds so sliding text doesn't overflow -->
-                                    <Grid Grid.Column="1" Margin="8,0,0,0" ClipToBounds="True">
-                                        <Grid x:Name="TrackInfoPanel">
-                                            <Grid.RenderTransform>
-                                                <TranslateTransform x:Name="TrackInfoShift" />
-                                            </Grid.RenderTransform>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto" />
-                                                <!-- title -->
-                                                <RowDefinition Height="Auto" />
-                                                <!-- artist -->
-                                            </Grid.RowDefinitions>
+                                        <Image x:Name="AlbumCover" HorizontalAlignment="Center" Height="50"
+                                       VerticalAlignment="Top" Width="50"
+                                       Source="/Sprites/Empty.png" RenderTransformOrigin="0.5,0.5">
+                                            <Image.Clip>
+                                                <RectangleGeometry Rect="0,0,50,50" RadiusX="15" RadiusY="15" />
+                                            </Image.Clip>
+                                        </Image>
 
-                                            <TextBlock x:Name="TrackTitle" Text="Track"
-                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
-                                       VerticalAlignment="Center" Height="24"
-                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" HorizontalAlignment="Left" />
-                                            <TextBlock x:Name="ArtistName" Text="Artist" Grid.Row="1"
-                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
-                                       VerticalAlignment="Center" Height="24"
-                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" HorizontalAlignment="Left" />
+                                        <!-- Text container clipped to column bounds so sliding text doesn't overflow -->
+                                        <Grid Grid.Column="1" Margin="8,0,0,0" ClipToBounds="True">
+                                            <Grid x:Name="TrackInfoPanel">
+                                                <Grid.RenderTransform>
+                                                    <TranslateTransform x:Name="TrackInfoShift" />
+                                                </Grid.RenderTransform>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <!-- title -->
+                                                    <RowDefinition Height="Auto" />
+                                                    <!-- artist -->
+                                                </Grid.RowDefinitions>
+
+                                                <TextBlock x:Name="TrackTitle" Text="Track"
+                                           Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                           VerticalAlignment="Center" Height="24"
+                                           TextTrimming="CharacterEllipsis" TextAlignment="Left" HorizontalAlignment="Left" Width="175" />
+                                                <TextBlock x:Name="ArtistName" Text="Artist" Grid.Row="1"
+                                           Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                           VerticalAlignment="Center" Height="24"
+                                           TextTrimming="CharacterEllipsis" TextAlignment="Left" HorizontalAlignment="Left" />
+                                            </Grid>
                                         </Grid>
+
+                                        <!-- Transport buttons: span both columns and center on the media area -->
+                                        <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal"
+                                                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4">
+                                            <Button x:Name="LastButton" Style="{StaticResource IconButton}"
+                                                Width="28" Height="28" Margin="8,0"
+                                                Click="Last_Click">
+                                                <Image x:Name="Last" Source="/Sprites/back.png" />
+                                            </Button>
+                                            <Button x:Name="PlayPauseButton" Style="{StaticResource IconButton}"
+                                                Width="28" Height="28" Margin="8,0"
+                                                Click="PlayPause_Click">
+                                                <Image x:Name="PlayPause" Source="/Sprites/pause.png" />
+                                            </Button>
+                                            <Button x:Name="NextButton" Style="{StaticResource IconButton}"
+                                                Width="28" Height="28" Margin="8,0"
+                                                Click="Next_Click">
+                                                <Image x:Name="Next" Source="/Sprites/forward.png" />
+                                            </Button>
+                                        </StackPanel>
+
+                                        <!-- Now-playing waveform, pinned to the bottom-right of the media area -->
+                                        <local:GifImage x:Name="ExpandedWave" Grid.ColumnSpan="2"
+                                                        SourceUri="/Sprites/music_waveform.gif"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Height="16" Width="16" Margin="0,0,8,4"
+                                                        RenderOptions.BitmapScalingMode="HighQuality"
+                                                        Visibility="Visible" />
                                     </Grid>
 
-                                    <!-- Transport buttons: span both columns and center on the whole notch,
-                                         not just the text column -->
-                                    <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal"
-                                            HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4">
-                                        <Button x:Name="LastButton" Style="{StaticResource IconButton}"
-                                            Width="28" Height="28" Margin="8,0"
-                                            Click="Last_Click">
-                                            <Image x:Name="Last" Source="/Sprites/back.png" />
-                                        </Button>
-                                        <Button x:Name="PlayPauseButton" Style="{StaticResource IconButton}"
-                                            Width="28" Height="28" Margin="8,0"
-                                            Click="PlayPause_Click">
-                                            <Image x:Name="PlayPause" Source="/Sprites/pause.png" />
-                                        </Button>
-                                        <Button x:Name="NextButton" Style="{StaticResource IconButton}"
-                                            Width="28" Height="28" Margin="8,0"
-                                            Click="Next_Click">
-                                            <Image x:Name="Next" Source="/Sprites/forward.png" />
-                                        </Button>
-                                    </StackPanel>
+                                    <!-- Separator between the media and device sides -->
+                                    <Border Grid.Column="0" Width="1"
+                                            HorizontalAlignment="Right"
+                                            Background="#33FFFFFF"
+                                            Margin="0,6,0,6" />
+
+                                    <!-- Device part: audio icon, device name and volume bar -->
+                                    <Grid Grid.Column="1" Margin="10,0,0,0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <Image x:Name="DeviceIcon" Grid.Row="0"
+                                               Height="16" Width="16"
+                                               HorizontalAlignment="Center"
+                                               Source="/Sprites/bluetooth_audio.png"
+                                               SnapsToDevicePixels="True"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                        <TextBlock x:Name="DeviceNameText" Grid.Row="1"
+                                                   Text="Connected Device"
+                                                   Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                   FontSize="14" FontWeight="SemiBold"
+                                                   TextAlignment="Center" VerticalAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ClipToBounds="True"
+                                                   Height="36"
+                                                   Margin="0,2,0,0" />
+
+                                        <local:KnoblessSlider x:Name="Volume" Grid.Row="2"
+                                            Style="{StaticResource KnoblessSlider}"
+                                            VerticalAlignment="Center"
+                                            Minimum="0" Maximum="100"
+                                            Margin="0,0,0,2" Height="20" Cursor="Hand" />
+                                    </Grid>
                                 </Grid>
 
-                                <!-- Devices tab -->
-                                <Grid x:Name="DevicesContent" Visibility="Collapsed">
-                                    <Image x:Name="DeviceIcon" HorizontalAlignment="Left" Height="52" Margin="14,0,0,0" VerticalAlignment="Center" Width="52" Source="/Sprites/bluetooth_audio.png" SnapsToDevicePixels="True" RenderOptions.BitmapScalingMode="HighQuality"/>
-                                    <TextBlock x:Name="DeviceNameText" Text="Connected Device"
-                                               Foreground="White" FontFamily="{StaticResource sf_regular}"
-                                               FontSize="13" FontWeight="SemiBold"
-                                               Margin="80,16,14,0" VerticalAlignment="Top"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <local:KnoblessSlider x:Name="Volume"
-                                Style="{StaticResource KnoblessSlider}"
-                                VerticalAlignment="Top"
-                                Minimum="0" Maximum="100"
-                                Margin="80,44,14,0" Height="20" Cursor="Hand"/>
+                                <!-- History tab: every notification seen this session, newest first.
+                                     Scrolling is snapped to whole rows (see SnapScrollViewer). -->
+                                <Grid x:Name="HistoryContent" Visibility="Collapsed">
+                                    <local:SnapScrollViewer x:Name="HistoryScroller"
+                                                            SnapInterval="36"
+                                                            VerticalScrollBarVisibility="Hidden"
+                                                            HorizontalScrollBarVisibility="Disabled"
+                                                            Focusable="False"
+                                                            ClipToBounds="True">
+                                        <ItemsControl x:Name="HistoryList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Height="{Binding SnapInterval, RelativeSource={RelativeSource AncestorType={x:Type local:SnapScrollViewer}}}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Image Grid.Column="0" Width="24" Height="24"
+                                                               VerticalAlignment="Center"
+                                                               Source="{Binding Icon}">
+                                                            <Image.Clip>
+                                                                <RectangleGeometry Rect="0,0,24,24" RadiusX="6" RadiusY="6" />
+                                                            </Image.Clip>
+                                                        </Image>
+
+                                                        <Grid Grid.Column="1" Margin="8,0,0,0">
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="*" />
+                                                            </Grid.RowDefinitions>
+
+                                                            <TextBlock Grid.Row="0" Text="{Binding Title}"
+                                                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                                       FontSize="12" FontWeight="SemiBold"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Row="1" Text="{Binding Body}"
+                                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                                                       FontSize="11"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
+
+                                                        <TextBlock Grid.Column="2" Text="{Binding TimeText}"
+                                                                   Foreground="#FF7A7A7A" FontFamily="{StaticResource sf_regular}"
+                                                                   FontSize="10"
+                                                                   VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </local:SnapScrollViewer>
+
+                                    <TextBlock x:Name="HistoryEmpty" Text="No notifications yet"
+                                               Foreground="#FF8A8A8A" FontFamily="{StaticResource sf_regular}"
+                                               FontSize="12"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Grid>
                             </Grid>
                         </Grid>
@@ -271,6 +372,66 @@
                             <RectangleGeometry Rect="0,0,20,20" RadiusX="5" RadiusY="5" />
                         </Image.Clip>
                     </Image>
+
+                    <!-- Right-aligned row: privacy dots, then the playing waveform. The dots sit to
+                         the left of the waveform while it's shown, and slide all the way to the right
+                         when it's hidden. Each item is a clipped "slot" whose width and opacity are
+                         animated together, so shows/hides slide the row smoothly instead of snapping. -->
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Margin="0,0,10,0">
+                        <Border x:Name="MicSlot" Width="0" VerticalAlignment="Center"
+                                ClipToBounds="True" Visibility="Collapsed">
+                            <Ellipse x:Name="MicDot" Width="8" Height="8" HorizontalAlignment="Left"
+                                     Fill="#FFFF9F0A" />
+                        </Border>
+                        <Border x:Name="CameraSlot" Width="0" Padding="5,0,0,0" VerticalAlignment="Center"
+                                ClipToBounds="True" Visibility="Collapsed">
+                            <Ellipse x:Name="CameraDot" Width="8" Height="8" HorizontalAlignment="Left"
+                                     Fill="#FF30D158" />
+                        </Border>
+                        <Border x:Name="WaveSlot" Width="0" Padding="6,0,0,0" VerticalAlignment="Center"
+                                ClipToBounds="True" Visibility="Collapsed">
+                            <local:GifImage x:Name="PeekWave"
+                                            SourceUri="/Sprites/music_waveform.gif"
+                                            Height="16" Width="16" HorizontalAlignment="Left"
+                                            RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Shown while a toast notification is displayed: the sending app's icon on the
+                     left, then the title and body text stacked in two equal halves. -->
+                <Grid x:Name="NotificationContent" Visibility="Collapsed" Margin="14,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Image x:Name="NotifIcon" Grid.Column="0" Width="44" Height="44"
+                           VerticalAlignment="Center">
+                        <Image.Clip>
+                            <RectangleGeometry Rect="0,0,44,44" RadiusX="10" RadiusY="10" />
+                        </Image.Clip>
+                    </Image>
+
+                    <Grid x:Name="NotifTextHost" Grid.Column="1" Margin="12,0,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock x:Name="NotifTitle" Grid.Row="0"
+                                   Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="NotifBody" Grid.Row="1"
+                                   Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
                 </Grid>
             </Grid>
         </Border>

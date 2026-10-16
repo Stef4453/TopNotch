@@ -25,6 +25,7 @@
     <None Remove="Sprites\Empty.png" />
     <None Remove="Sprites\forward.png" />
     <None Remove="Sprites\Headphones.png" />
+    <None Remove="Sprites\music_waveform.gif" />
     <None Remove="Sprites\pause.png" />
     <None Remove="Sprites\play.png" />
     <None Remove="Sprites\skip.png" />
@@ -82,6 +83,9 @@
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Sprites\Headphones.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\music_waveform.gif">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Sprites\pause.png">

@@ -1,9 +1,13 @@
+using System.Collections.ObjectModel;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace TopNotch
 {
@@ -16,6 +20,10 @@ namespace TopNotch
 
         private readonly AudioService _audio = new();
 
+        private readonly PrivacyService _privacy = new();
+
+        private DispatcherTimer? _topmostTimer;
+
         private bool _updatingFromSystem;
 
         // Swipe transition state (text only)
@@ -27,6 +35,9 @@ namespace TopNotch
         // Tab switching state
         private bool _currentTabIsMedia = true;
         private bool _isTabAnimating;
+
+        // Notification history for the current session only (newest first).
+        private readonly ObservableCollection<NotificationRecord> _history = new();
 
         private static BitmapImage LoadIcon(string name, int decodePixelWidth = 0)
         {
@@ -62,6 +73,9 @@ namespace TopNotch
             ArtistName.Text = "";
             SetMediaActive(false);
             UpdateTabHighlight(showMedia: true);   // Media tab is active on startup
+
+            HistoryList.ItemsSource = _history;
+            HistoryEmpty.Visibility = Visibility.Visible;   // nothing recorded yet
 
             _media.TrackChanged += (title, artist) => Dispatcher.Invoke(() =>
             {
@@ -101,6 +115,53 @@ namespace TopNotch
             UpdateContentVisibility();
         }
 
+        // Keep this overlay out of Alt-Tab and make it non-activatable, so it can never
+        // take focus (and therefore never receives Alt+F4). Clicking it still delivers
+        // normal mouse input to the controls.
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            var hwnd = new WindowInteropHelper(this).Handle;
+            int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+            exStyle |= WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
+            exStyle &= ~WS_EX_APPWINDOW;
+            SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+
+            // Force ourselves to the top of the topmost band whenever our z-order is
+            // about to change...
+            HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+            ForceTopmost();
+
+            // ...and re-assert it periodically, since other apps (e.g. Apple Music
+            // maximizing on launch) can raise themselves above a plain topmost window.
+            _topmostTimer = new DispatcherTimer(DispatcherPriority.Background)
+            {
+                Interval = TimeSpan.FromMilliseconds(500)
+            };
+            _topmostTimer.Tick += (s, args) => ForceTopmost();
+            _topmostTimer.Start();
+        }
+
+        private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == WM_WINDOWPOSCHANGING)
+            {
+                var pos = Marshal.PtrToStructure<WINDOWPOS>(lParam);
+                pos.hwndInsertAfter = HWND_TOPMOST;
+                pos.flags &= ~SWP_NOZORDER;
+                Marshal.StructureToPtr(pos, lParam, false);
+            }
+            return IntPtr.Zero;
+        }
+
+        private void ForceTopmost()
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
             Left = (SystemParameters.PrimaryScreenWidth - Width) / 2;
@@ -127,8 +188,15 @@ namespace TopNotch
             _audio.Init();
             Closed += (s, args) =>
             {
+                _topmostTimer?.Stop();
+                _notifyTimer.Stop();
                 _audio.Dispose();
+                _privacy.Dispose();
+                _notification.Dispose();
             };
+
+            _privacy.StateChanged += (mic, cam) => Dispatcher.BeginInvoke(() => UpdatePrivacyDots(mic, cam));
+            _privacy.Init();
 
             _audio.DeviceChanged += (deviceName, isBluetooth) => Dispatcher.BeginInvoke(() =>
             {
@@ -139,7 +207,21 @@ namespace TopNotch
             _media.PlayingChanged += playing => Dispatcher.BeginInvoke(() =>
             {
                 PlayPause.Source = playing ? _pauseIcon : _playIcon;
+
+                // Waveform (expanded + peek) shows while audio is playing, but fades/slides in
+                // and out instead of snapping on pause/stop.
+                AnimateSlot(WaveSlot, WaveSlotWidth, playing);
+                AnimateSlot(ExpandedWave, ExpandedWaveWidth, playing);
             });
+
+            _notifyTimer.Tick += (s, args) => DismissNotification();
+
+            _notification.NotificationRaised += info => Dispatcher.BeginInvoke(() =>
+            {
+                RecordNotification(info);
+                ShowNotification(info);
+            });
+            await _notification.InitAsync();
 
             await _media.InitAsync();
 
@@ -180,13 +262,57 @@ namespace TopNotch
             DeviceIcon.Source = isBluetooth ? _bluetoothAudioIcon : _audioIcon;
         }
 
+        private void UpdatePrivacyDots(bool micActive, bool cameraActive)
+        {
+            AnimateSlot(MicSlot, MicSlotWidth, micActive);
+            AnimateSlot(CameraSlot, CameraSlotWidth, cameraActive);
+        }
+
+        // Peek items live in clipped, fixed-width "slots" so showing or hiding one slides the
+        // whole right-aligned row smoothly. Each slot's width (which includes its leading gap as
+        // padding) and opacity are animated together; Width = 0 leaves no stray gap behind.
+        private const double MicSlotWidth = 8;
+        private const double CameraSlotWidth = 13;   // 5px leading gap + 8px dot
+        private const double WaveSlotWidth = 22;     // 6px leading gap + 16px waveform
+        private const double ExpandedWaveWidth = 16;
+        private static readonly TimeSpan RevealDuration = TimeSpan.FromMilliseconds(220);
+
+        private static void AnimateSlot(FrameworkElement slot, double fullWidth, bool show)
+        {
+            var ease = new CubicEase { EasingMode = show ? EasingMode.EaseOut : EasingMode.EaseIn };
+
+            if (show)
+                slot.Visibility = Visibility.Visible;
+
+            var width = new DoubleAnimation
+            {
+                From = show ? 0 : fullWidth,
+                To = show ? fullWidth : 0,
+                Duration = RevealDuration,
+                EasingFunction = ease
+            };
+            var opacity = new DoubleAnimation
+            {
+                From = show ? 0 : 1,
+                To = show ? 1 : 0,
+                Duration = RevealDuration,
+                EasingFunction = ease
+            };
+
+            if (!show)
+                width.Completed += (_, _) => slot.Visibility = Visibility.Collapsed;
+
+            slot.BeginAnimation(FrameworkElement.WidthProperty, width);
+            slot.BeginAnimation(UIElement.OpacityProperty, opacity);
+        }
+
         // Tab switching
 
         private void UpdateTabHighlight(bool showMedia)
         {
             var inactive = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x8A, 0x8A, 0x8A));
             MediaTab.Foreground = showMedia ? System.Windows.Media.Brushes.White : inactive;
-            DeviceTab.Foreground = showMedia ? inactive : System.Windows.Media.Brushes.White;
+            HistoryTab.Foreground = showMedia ? inactive : System.Windows.Media.Brushes.White;
         }
 
         private async void Tab_Click(object sender, RoutedEventArgs e)
@@ -204,7 +330,7 @@ namespace TopNotch
             // Slight, noticeable delay before actually switching
             await Task.Delay(110);
 
-            if (!showMedia)
+            if (showMedia)
             {
                 string currentAudio = _audio.DefaultDeviceName ?? "Connected Device";
                 string cleanAudio = currentAudio.Replace("Headphones (", "").Replace("Speakers (", "").Replace(")", "").Trim();
@@ -214,7 +340,7 @@ namespace TopNotch
             if (!_expanded)
             {
                 MediaContent.Visibility = showMedia ? Visibility.Visible : Visibility.Collapsed;
-                DevicesContent.Visibility = showMedia ? Visibility.Collapsed : Visibility.Visible;
+                HistoryContent.Visibility = showMedia ? Visibility.Collapsed : Visibility.Visible;
                 TabContentShift.BeginAnimation(TranslateTransform.XProperty, null);
                 TabContentHost.BeginAnimation(OpacityProperty, null);
                 TabContentShift.X = 0;
@@ -247,7 +373,7 @@ namespace TopNotch
             {
                 // Switch tab visibility at midpoint
                 MediaContent.Visibility = showMedia ? Visibility.Visible : Visibility.Collapsed;
-                DevicesContent.Visibility = showMedia ? Visibility.Collapsed : Visibility.Visible;
+                HistoryContent.Visibility = showMedia ? Visibility.Collapsed : Visibility.Visible;
 
                 // Reset position to incoming side
                 TabContentShift.BeginAnimation(TranslateTransform.XProperty, null);
@@ -282,11 +408,27 @@ namespace TopNotch
 
         private const double RestY = -20;
         private const double HoverY = 0;
+        private const double ExpandedWidth = 420;
+        private const double ExpandedHeight = 120;
+        private const double PeekWidth = 160;
+        private const double PeekHeight = 32;
+
+        // A notification banner is as long as the expanded island, but about half as tall.
+        private const double NotificationWidth = ExpandedWidth;
+        private const double NotificationHeight = ExpandedHeight / 2;
+
+        private readonly NotificationService _notification = new();
+        private readonly DispatcherTimer _notifyTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+        private bool _notifying;    // a banner currently owns the island
+        private bool _dismissing;    // banner is fading out, but still painted
+        private double _restoreWidth;    // island size to return to after a banner
+        private double _restoreHeight;
 
         private void Zone_MouseEnter(object sender, MouseEventArgs e)
         {
             _hovered = true;
             UpdateContentVisibility();
+            if (_notifying) return;   // the banner owns the island until it's dismissed
             MoveIsland(HoverY);
         }
 
@@ -294,40 +436,150 @@ namespace TopNotch
         {
             _hovered = false;
             UpdateContentVisibility();
+            if (_notifying) return;
             MoveIsland(RestY);
         }
 
+        // Slides the island into view (hover) or up out of sight (rest).
         private void MoveIsland(double targetY)
         {
             if (!_expanded)
+                SlideIsland(targetY);
+        }
+
+        private void SlideIsland(double targetY)
+        {
+            var anim = new DoubleAnimation(targetY, TimeSpan.FromMilliseconds(250))
             {
-                var anim = new DoubleAnimation(targetY, TimeSpan.FromMilliseconds(250))
-                {
-                    EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 }
-                };
-                IslandShift.BeginAnimation(TranslateTransform.YProperty, anim);
-            }
+                EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 }
+            };
+            IslandShift.BeginAnimation(TranslateTransform.YProperty, anim);
+        }
+
+        private void AnimateIslandSize(double width, double height)
+        {
+            var ease = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 };
+            var duration = TimeSpan.FromMilliseconds(350);
+
+            Island.BeginAnimation(WidthProperty, new DoubleAnimation(width, duration) { EasingFunction = ease });
+            Island.BeginAnimation(HeightProperty, new DoubleAnimation(height, duration) { EasingFunction = ease });
         }
 
         private void UpdateContentVisibility()
         {
-            // Expanded shows the tabbed UI; retracted+hovered shows the peek panel; otherwise nothing.
-            ExpandedContent.Visibility = _expanded ? Visibility.Visible : Visibility.Collapsed;
-            PeekContent.Visibility = (!_expanded && _hovered) ? Visibility.Visible : Visibility.Collapsed;
+            // A live (or still-fading) banner overrides everything else; otherwise the expanded
+            // tabbed UI shows, or the peek panel when retracted and hovered.
+            bool banner = _notifying || _dismissing;
+
+            NotificationContent.Visibility = banner ? Visibility.Visible : Visibility.Collapsed;
+            ExpandedContent.Visibility = (!banner && _expanded) ? Visibility.Visible : Visibility.Collapsed;
+            PeekContent.Visibility = (!banner && !_expanded && _hovered) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void Island_Click(object sender, MouseButtonEventArgs e)
         {
+            if (_notifying)
+            {
+                DismissNotification();   // clicking the banner dismisses it early
+                return;
+            }
+
             _expanded = !_expanded;
             UpdateContentVisibility();
+            AnimateIslandSize(_expanded ? ExpandedWidth : PeekWidth, _expanded ? ExpandedHeight : PeekHeight);
+        }
 
-            var ease = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 };
-            var duration = TimeSpan.FromMilliseconds(350);
+        // ---- Notifications ----
 
-            Island.BeginAnimation(WidthProperty,
-                new DoubleAnimation(_expanded ? 420 : 160, duration) { EasingFunction = ease });
-            Island.BeginAnimation(HeightProperty,
-                new DoubleAnimation(_expanded ? 120 : 32, duration) { EasingFunction = ease });
+        // Adds a notification to the session history tab. Kept separate from the banner so that
+        // one arriving while another is on screen is still catalogued.
+        private void RecordNotification(NotificationInfo info)
+        {
+            var icon = info.IconPng is { Length: > 0 } ? CreateBitmap(info.IconPng, 48) : null;
+            _history.Insert(0, new NotificationRecord(info.AppName, info.Title, info.Body, icon, DateTime.Now));
+
+            HistoryEmpty.Visibility = Visibility.Collapsed;
+            HistoryScroller.NotifyInsertedAtTop(_history.Count);
+        }
+
+        private void ShowNotification(NotificationInfo info)
+        {
+            NotifTitle.Text = info.Title;
+            NotifBody.Text = info.Body;
+
+            if (info.IconPng is { Length: > 0 })
+            {
+                NotifIcon.Source = CreateBitmap(info.IconPng, 96);
+                NotifIcon.Visibility = Visibility.Visible;
+                NotifTextHost.Margin = new Thickness(12, 0, 0, 0);
+            }
+            else
+            {
+                NotifIcon.Source = null;
+                NotifIcon.Visibility = Visibility.Collapsed;
+                NotifTextHost.Margin = new Thickness(0);
+            }
+
+            bool alreadyShowing = _notifying;
+
+            if (!alreadyShowing)
+            {
+                // Remember the island's current size so we can put it back afterwards.
+                _restoreWidth = double.IsNaN(Island.Width) ? ExpandedWidth : Island.Width;
+                _restoreHeight = double.IsNaN(Island.Height) ? ExpandedHeight : Island.Height;
+
+                AnimateIslandSize(NotificationWidth, NotificationHeight);
+                SlideIsland(HoverY);   // a resting island should come fully on screen
+            }
+
+            _notifying = true;
+            _dismissing = false;
+            UpdateContentVisibility();
+
+            NotificationContent.BeginAnimation(OpacityProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+
+            _notifyTimer.Stop();
+            _notifyTimer.Start();
+        }
+
+        private void DismissNotification()
+        {
+            _notifyTimer.Stop();
+            if (!_notifying) return;
+
+            _notifying = false;
+            _dismissing = true;          // keep the banner painted while it fades
+            AnimateIslandSize(_restoreWidth, _restoreHeight);
+            MoveIsland(_hovered ? HoverY : RestY);
+            UpdateContentVisibility();
+
+            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(180))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+            fade.Completed += (_, _) =>
+            {
+                if (_notifying) return;  // a newer notification took over mid-fade
+                _dismissing = false;
+                UpdateContentVisibility();
+            };
+            NotificationContent.BeginAnimation(OpacityProperty, fade);
+        }
+
+        private static BitmapImage CreateBitmap(byte[] bytes, int decodeWidth = 0)
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.StreamSource = new MemoryStream(bytes);
+            if (decodeWidth > 0) bmp.DecodePixelWidth = decodeWidth;
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
         }
 
         // Swipe transition for track title and artist text changes
@@ -382,11 +634,15 @@ namespace TopNotch
                 slideIn.Completed += (s2, e2) =>
                 {
                     _isSwipeAnimating = false;
-                    _swipeDirection = 1; // reset to default for system-level changes
 
-                    // If another track change arrived mid-animation, chain it
+                    // If another track change arrived mid-animation, chain it while
+                    // keeping the current direction, so rapid presses of the same
+                    // button keep swiping the same way. Only fall back to the default
+                    // direction once we're idle again (for system-level changes).
                     if (_pendingTitle != null || _pendingArtist != null)
                         AnimateTrackSwipe();
+                    else
+                        _swipeDirection = 1;
                 };
 
                 TrackInfoShift.BeginAnimation(TranslateTransform.XProperty, slideIn);
@@ -396,5 +652,42 @@ namespace TopNotch
             TrackInfoShift.BeginAnimation(TranslateTransform.XProperty, slideOut);
             TrackInfoPanel.BeginAnimation(OpacityProperty, fadeOut);
         }
+
+        // ---- Overlay window styles ----
+
+        private const int GWL_EXSTYLE = -20;
+        private const int WS_EX_TOOLWINDOW = 0x00000080;
+        private const int WS_EX_APPWINDOW = 0x00040000;
+        private const int WS_EX_NOACTIVATE = 0x08000000;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        // ---- Always-on-top enforcement ----
+
+        private const int WM_WINDOWPOSCHANGING = 0x0046;
+        private static readonly IntPtr HWND_TOPMOST = new(-1);
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOZORDER = 0x0004;
+        private const uint SWP_NOACTIVATE = 0x0010;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WINDOWPOS
+        {
+            public IntPtr hwnd;
+            public IntPtr hwndInsertAfter;
+            public int x;
+            public int y;
+            public int cx;
+            public int cy;
+            public uint flags;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     }
 }
