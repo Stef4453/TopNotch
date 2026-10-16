@@ -1,0 +1,278 @@
+<Window x:Name="Notch" x:Class="TopNotch.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TopNotch"
+        mc:Ignorable="d"
+         WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        ResizeMode="NoResize"
+        Width="500" Height="160"
+        Loaded="Window_Loaded"
+        RenderOptions.BitmapScalingMode="HighQuality">
+
+    <Window.Resources>
+        <Style TargetType="Image">
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+        </Style>
+
+        <FontFamily x:Key="sf_regular">/Fonts/#SF Pro Display</FontFamily>
+
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="1" ScaleY="1" />
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.85" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="RenderTransform">
+                        <Setter.Value>
+                            <ScaleTransform ScaleX="0.88" ScaleY="0.88" />
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="TabButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="#FF8A8A8A" />
+            <Setter Property="FontFamily" Value="{StaticResource sf_regular}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="10,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="KnoblessSlider" TargetType="{x:Type local:KnoblessSlider}">
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Background" Value="#555555"/>
+            <Setter Property="Foreground" Value="White"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type local:KnoblessSlider}">
+                        <Grid Background="Transparent"
+                      VerticalAlignment="Center">
+
+                            <Track x:Name="PART_Track"
+                           Height="6"
+                           IsDirectionReversed="False">
+
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton
+                                Background="{TemplateBinding Foreground}"
+                                BorderThickness="0"
+                                Focusable="False"
+                                IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border
+                                            Background="{TemplateBinding Background}"
+                                            CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="0"
+                                Focusable="False"
+                                IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border
+                                            Background="{TemplateBinding Background}"
+                                            CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+
+                                <Track.Thumb>
+                                    <Thumb Width="0"
+                                   Height="0"
+                                   Opacity="0"
+                                   Focusable="False"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="HoverZone"
+      Background="Transparent"
+      Width="420" Height="130"
+      HorizontalAlignment="Center" VerticalAlignment="Top"
+      MouseEnter="Zone_MouseEnter"
+      MouseLeave="Zone_MouseLeave" Margin="0,-3,0,0">
+
+        <Border x:Name="Island"
+        Background="Black"
+        CornerRadius="0,0,20,20"
+        Width="420" Height="120"
+        VerticalAlignment="Top"
+        MouseLeftButtonDown="Island_Click">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="IslandShift" Y="-0" />
+            </Border.RenderTransform>
+
+            <Grid>
+                <!-- Shown only when the island is expanded -->
+                <Grid x:Name="ExpandedContent" Visibility="Visible" ClipToBounds="True">
+                    <Grid Margin="16,8,16,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <!-- tab strip -->
+                            <RowDefinition Height="*" />
+                            <!-- tab content -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Tab strip -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,6">
+                            <Button x:Name="MediaTab" Content="Media" Style="{StaticResource TabButton}" Click="Tab_Click" Margin="6,0" />
+                            <Button x:Name="DeviceTab" Content="Devices" Style="{StaticResource TabButton}" Click="Tab_Click" Margin="6,0" />
+                        </StackPanel>
+
+                        <!-- Tab content container (clipped to prevent spill outside tab area) -->
+                        <Grid Grid.Row="1" ClipToBounds="True">
+                            <Grid x:Name="TabContentHost">
+                                <Grid.RenderTransform>
+                                    <TranslateTransform x:Name="TabContentShift" />
+                                </Grid.RenderTransform>
+
+                                <!-- Media tab -->
+                                <Grid x:Name="MediaContent" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="64" />
+                                        <!-- album art -->
+                                        <ColumnDefinition Width="*" />
+                                        <!-- everything else -->
+                                    </Grid.ColumnDefinitions>
+
+                                    <Image x:Name="AlbumCover" HorizontalAlignment="Center" Height="50"
+                                   VerticalAlignment="Top" Width="50"
+                                   Source="/Sprites/Empty.png" RenderTransformOrigin="0.5,0.5">
+                                        <Image.Clip>
+                                            <RectangleGeometry Rect="0,0,50,50" RadiusX="15" RadiusY="15" />
+                                        </Image.Clip>
+                                    </Image>
+
+                                    <!-- Text container clipped to column bounds so sliding text doesn't overflow -->
+                                    <Grid Grid.Column="1" Margin="8,0,0,0" ClipToBounds="True">
+                                        <Grid x:Name="TrackInfoPanel">
+                                            <Grid.RenderTransform>
+                                                <TranslateTransform x:Name="TrackInfoShift" />
+                                            </Grid.RenderTransform>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <!-- title -->
+                                                <RowDefinition Height="Auto" />
+                                                <!-- artist -->
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock x:Name="TrackTitle" Text="Track"
+                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                       VerticalAlignment="Center" Height="24"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" HorizontalAlignment="Left" />
+                                            <TextBlock x:Name="ArtistName" Text="Artist" Grid.Row="1"
+                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                       VerticalAlignment="Center" Height="24"
+                                       TextTrimming="CharacterEllipsis" TextAlignment="Center" HorizontalAlignment="Left" />
+                                        </Grid>
+                                    </Grid>
+
+                                    <!-- Transport buttons: span both columns and center on the whole notch,
+                                         not just the text column -->
+                                    <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal"
+                                            HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4">
+                                        <Button x:Name="LastButton" Style="{StaticResource IconButton}"
+                                            Width="28" Height="28" Margin="8,0"
+                                            Click="Last_Click">
+                                            <Image x:Name="Last" Source="/Sprites/back.png" />
+                                        </Button>
+                                        <Button x:Name="PlayPauseButton" Style="{StaticResource IconButton}"
+                                            Width="28" Height="28" Margin="8,0"
+                                            Click="PlayPause_Click">
+                                            <Image x:Name="PlayPause" Source="/Sprites/pause.png" />
+                                        </Button>
+                                        <Button x:Name="NextButton" Style="{StaticResource IconButton}"
+                                            Width="28" Height="28" Margin="8,0"
+                                            Click="Next_Click">
+                                            <Image x:Name="Next" Source="/Sprites/forward.png" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Devices tab -->
+                                <Grid x:Name="DevicesContent" Visibility="Collapsed">
+                                    <Image x:Name="DeviceIcon" HorizontalAlignment="Left" Height="52" Margin="14,0,0,0" VerticalAlignment="Center" Width="52" Source="/Sprites/bluetooth_audio.png" SnapsToDevicePixels="True" RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <TextBlock x:Name="DeviceNameText" Text="Connected Device"
+                                               Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                               FontSize="13" FontWeight="SemiBold"
+                                               Margin="80,16,14,0" VerticalAlignment="Top"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <local:KnoblessSlider x:Name="Volume"
+                                Style="{StaticResource KnoblessSlider}"
+                                VerticalAlignment="Top"
+                                Minimum="0" Maximum="100"
+                                Margin="80,44,14,0" Height="20" Cursor="Hand"/>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Grid>
+
+                <!-- Shown only when retracted AND hovered. Put custom peek content here. -->
+                <Grid x:Name="PeekContent" Visibility="Collapsed">
+                    <Image x:Name="PeekAlbumCover" HorizontalAlignment="Left"
+                       Height="20" Width="20" Margin="8,0,0,0"
+                       VerticalAlignment="Center">
+                        <Image.Clip>
+                            <RectangleGeometry Rect="0,0,20,20" RadiusX="5" RadiusY="5" />
+                        </Image.Clip>
+                    </Image>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,139 @@
+<Window x:Name="Notch" x:Class="TopNotch.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TopNotch"
+        mc:Ignorable="d"
+         WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        ResizeMode="NoResize"
+        Width="500" Height="160"
+        Loaded="Window_Loaded">
+
+    <Window.Resources>
+        <FontFamily x:Key="sf_regular">/Fonts/#SF Pro Display</FontFamily>
+
+
+        <Style x:Key="KnoblessSlider" TargetType="Slider">
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Background" Value="#555555"/>
+            <Setter Property="Foreground" Value="White"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Background="Transparent"
+                      VerticalAlignment="Center">
+
+                            <Track x:Name="PART_Track"
+                           Height="6"
+                           IsDirectionReversed="False">
+
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton
+                                Background="{TemplateBinding Foreground}"
+                                BorderThickness="0"
+                                Focusable="False"
+                                IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border
+                                            Background="{TemplateBinding Background}"
+                                            CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="0"
+                                Focusable="False"
+                                IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border
+                                            Background="{TemplateBinding Background}"
+                                            CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+
+                                <Track.Thumb>
+                                    <Thumb Width="0"
+                                   Height="0"
+                                   Opacity="0"
+                                   Focusable="False"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="HoverZone"
+      Background="Transparent"
+      Width="420" Height="130"
+      HorizontalAlignment="Center" VerticalAlignment="Top"
+      MouseEnter="Zone_MouseEnter"
+      MouseLeave="Zone_MouseLeave" Margin="0,-3,0,0">
+
+        <Border x:Name="Island"
+        Background="Black"
+        CornerRadius="0,0,20,20"
+        Width="420" Height="120"
+        VerticalAlignment="Top"
+        MouseLeftButtonDown="Island_Click">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="IslandShift" Y="-0" />
+            </Border.RenderTransform>
+
+            <Grid Margin="16,12,16,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="64" />
+                    <!-- album art -->
+                    <ColumnDefinition Width="*" />
+                    <!-- everything else -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Album art placeholder -->
+
+                <!-- Text and slider stacked in the right column -->
+                <Grid Grid.ColumnSpan="2" Margin="0,-4,0,4">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <!-- title -->
+                        <RowDefinition Height="Auto" />
+                        <!-- artist -->
+                        <RowDefinition Height="*" />
+                        <!-- slider area -->
+                    </Grid.RowDefinitions>
+                    <local:KnoblessSlider Grid.Row="2" x:Name="Slider"
+                        Style="{StaticResource KnoblessSlider}"
+                        VerticalAlignment="Top"
+                        Minimum="0" Maximum="100"
+                        Margin="50,85,50,0"/>
+                    <Image x:Name="Last" HorizontalAlignment="Left" Height="28" Margin="136,52,0,0" Grid.RowSpan="3" VerticalAlignment="Top" Width="28" Source="/Sprites/back.png"/>
+                    <Image x:Name="PlayPause" HorizontalAlignment="Left" Height="28" Margin="174,52,0,0" Grid.RowSpan="3" VerticalAlignment="Top" Width="28" Source="/Sprites/pause.png"/>
+                    <Image x:Name="Next" HorizontalAlignment="Left" Height="28" Margin="212,52,0,0" Grid.RowSpan="3" VerticalAlignment="Top" Width="28" Source="/Sprites/forward.png"/>
+                    <Image x:Name="AlbumCover" HorizontalAlignment="Left" Height="65" Margin="10,-5,0,0" Grid.RowSpan="3" VerticalAlignment="Top" Width="65" Source="/Sprites/pause.png" RenderTransformOrigin="0.536,0.699">
+                        <Image.Clip>
+                            <RectangleGeometry Rect="0,0,65,65" RadiusX="8" RadiusY="8"/>
+                        </Image.Clip>
+                    </Image>
+                    <Label x:Name="TrackTitle" Content="National Treasures" VerticalAlignment="Top" Foreground="White" FontFamily="{StaticResource ResourceKey=sf_regular}" Margin="96,-1,0,0" Grid.Row="2" Width="260" HorizontalAlignment="Left"/>
+                    <Label x:Name="ArtistName" Content="Drake" VerticalAlignment="Top" Foreground="#FFBDBDBD" FontFamily="{StaticResource ResourceKey=sf_regular}" Margin="96,19,0,0" Grid.Row="2" Width="260" HorizontalAlignment="Left" Background="#00000000"/>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
