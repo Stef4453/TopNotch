@@ -55,15 +55,61 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Quick-action buttons. These get a surface of their own rather than just a glyph: they
+             are the largest targets on the tab, the glyphs sit in a box larger than the artwork, and
+             a template with no background only hit-tests where its content is, which would leave a
+             dead ring around each icon. Flat rounded rectangles a shade lighter than the island. -->
+        <Style x:Key="QuickActionButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="#22FFFFFF" CornerRadius="11">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#3AFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#4DFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Caption naming a quick-action tile. Shown only for the tile under the pointer, which is
+             exactly why it can be a proper 12px - the size the tabs and the date are set at - instead
+             of the 7px smudge that six permanent labels had to shrink to. For the same reason it is
+             allowed to overhang its own 40px column: nothing else is showing to collide with.
+             The line height is pinned rather than left to the font's metrics, because the two caption
+             bands are part of the block's height and a metric that drifted would push the bottom row
+             of tiles out of the tab. -->
+        <Style x:Key="QuickActionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFB4B4B4" />
+            <Setter Property="FontFamily" Value="{StaticResource sf_regular}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="LineHeight" Value="15" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+
+        <!-- Tab labels. Same weight for all three: the strip is centred, so letting the active
+             label get heavier would re-measure it and jog the whole strip sideways on every
+             switch. Colour and the underline carry the state instead. Padding is horizontal-only
+             so the underline beneath matches the label rather than the click target. -->
         <Style x:Key="TabButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Foreground" Value="#FF8A8A8A" />
+            <Setter Property="Foreground" Value="#FF9A9A9A" />
             <Setter Property="FontFamily" Value="{StaticResource sf_regular}" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Padding" Value="10,2" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="0,1" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -76,6 +122,60 @@
                     <Setter Property="Foreground" Value="White" />
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- Confirmation buttons. The cancel side is a quiet pill; the side that actually fires is
+             filled, because at this size the labels alone don't make the primary choice obvious. -->
+        <Style x:Key="ConfirmCancelButton" TargetType="Button">
+            <Setter Property="Background" Value="#1AFFFFFF" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontFamily" Value="{StaticResource sf_regular}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="13,4" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}"
+                                CornerRadius="12" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#38FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#52FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ConfirmAcceptButton" TargetType="Button" BasedOn="{StaticResource ConfirmCancelButton}">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="Foreground" Value="Black" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}"
+                                CornerRadius="12" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#CCFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#A6FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="KnoblessSlider" TargetType="{x:Type local:KnoblessSlider}">
@@ -141,7 +241,7 @@
 
     <Grid x:Name="HoverZone"
       Background="Transparent"
-      Width="420" Height="130"
+      Width="460" Height="142"
       HorizontalAlignment="Center" VerticalAlignment="Top"
       MouseEnter="Zone_MouseEnter"
       MouseLeave="Zone_MouseLeave" Margin="0,-3,0,0">
@@ -149,7 +249,7 @@
         <Border x:Name="Island"
         Background="Black"
         CornerRadius="0,0,20,20"
-        Width="420" Height="120"
+        Width="460" Height="142"
         VerticalAlignment="Top"
         MouseLeftButtonDown="Island_Click">
             <Border.RenderTransform>
@@ -159,7 +259,7 @@
             <Grid>
                 <!-- Shown only when the island is expanded -->
                 <Grid x:Name="ExpandedContent" Visibility="Visible" ClipToBounds="True">
-                    <Grid Margin="16,8,16,10">
+                    <Grid Margin="16,6,16,6">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <!-- tab strip -->
@@ -167,10 +267,25 @@
                             <!-- tab content -->
                         </Grid.RowDefinitions>
 
-                        <!-- Tab strip -->
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,6">
-                            <Button x:Name="MediaTab" Content="Media" Style="{StaticResource TabButton}" Click="Tab_Click" Margin="6,0" />
-                            <Button x:Name="HistoryTab" Content="History" Style="{StaticResource TabButton}" Click="Tab_Click" Margin="6,0" />
+                        <!-- Tab strip. Each label carries its own underline, laid out from the
+                             start and merely transparent while inactive, so the strip keeps its
+                             height and the labels never shift. -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,1,0,3">
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="HomeTab" Content="Home" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="HomeUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="MediaTab" Content="Media" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="MediaUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" Opacity="0" />
+                            </StackPanel>
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="HistoryTab" Content="History" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="HistoryUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" Opacity="0" />
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- Tab content container (clipped to prevent spill outside tab area) -->
@@ -180,8 +295,232 @@
                                     <TranslateTransform x:Name="TabContentShift" />
                                 </Grid.RenderTransform>
 
-                                <!-- Media tab -->
-                                <Grid x:Name="MediaContent" Visibility="Visible">
+                                <!-- Home tab: quick actions, clock, then usage, left to right. The
+                                     bars are sized in code-behind (which is why the fills start at
+                                     zero). -->
+                                <Grid x:Name="HomeContent" Visibility="Visible">
+                                    <!-- The side blocks are pinned to the outer edges and the clock
+                                         below spans all three columns, so it sits on the island's
+                                         centreline; the blocks are deliberately the same width so
+                                         the gap between each of them and the clock matches too. -->
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />   <!-- quick actions, hard left -->
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />   <!-- usage, hard right -->
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Quick actions: the largest thing on the tab, and the reason to
+                                         open it. A fixed three-by-two grid of 36x30 tiles, every cell
+                                         taken - four session actions, a link shortener and a
+                                         placeholder. The block is exactly as wide as the usage block
+                                         opposite (120px), and since the clock is centred that is what
+                                         puts it the same distance from the buttons as from the
+                                         indicators.
+                                         Each row of tiles has a caption line and it sits on the outer
+                                         side of the block - above the top row, below the bottom row -
+                                         so a label is always the closest text to the tile it names and
+                                         never lands between the two rows, where it would read as a
+                                         label for the pair. The two lines are reserved, so nothing
+                                         reflows when one appears, and empty at rest: six permanent
+                                         labels would shout over the clock, and at 7px - the only size
+                                         that fitted six of them - they were barely readable anyway. -->
+                                    <Grid Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="40" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />   <!-- top row's caption line -->
+                                            <RowDefinition Height="30" />     <!-- top row of tiles -->
+                                            <RowDefinition Height="6" />      <!-- gutter -->
+                                            <RowDefinition Height="30" />     <!-- bottom row of tiles -->
+                                            <RowDefinition Height="Auto" />   <!-- bottom row's caption line -->
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Each icon is drawn at a slightly different box size
+                                             because the exported canvases carry different amounts of
+                                             padding; these sizes put the glyphs at a common 22px,
+                                             which is the share of the tile the artwork has always
+                                             taken. picture.png is a landscape glyph, so its box ends
+                                             up taller than the button; the excess is transparent
+                                             canvas. Tag carries the name the caption line shows, and
+                                             a tile in the leftmost column needs a short one: the
+                                             caption overhangs the block happily on the right, where the
+                                             gap and the clock are, but the tab content is clipped at
+                                             the block's left edge, so nothing may run off that side.
+                                             "Power" is the long name there - "Shut Down" would lose its
+                                             first letter. -->
+                                        <Button Grid.Row="1" Grid.Column="0" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Power"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="Shutdown_Click">
+                                            <Image Source="/Sprites/power.png" Width="27" Height="27" />
+                                        </Button>
+
+                                        <Button Grid.Row="1" Grid.Column="1" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Restart"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="Restart_Click">
+                                            <Image Source="/Sprites/restart.png" Width="27" Height="27" />
+                                        </Button>
+
+                                        <Button Grid.Row="3" Grid.Column="0" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Sleep"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="Sleep_Click">
+                                            <Image Source="/Sprites/sleep.png" Width="23" Height="23" />
+                                        </Button>
+
+                                        <Button Grid.Row="3" Grid.Column="1" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Lock"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="Lock_Click">
+                                            <Image Source="/Sprites/lock.png" Width="25" Height="25" />
+                                        </Button>
+
+                                        <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Shorten Link"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="ShortenUrl_Click">
+                                            <Image Source="/Sprites/link.png" Width="22" Height="22" />
+                                        </Button>
+
+                                        <!-- Placeholder: the cell is wired up, captioned and sized like the
+                                             rest, but the button has no behaviour until its feature lands. -->
+                                        <Button Grid.Row="3" Grid.Column="2" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Share Image"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave">
+                                            <Image Source="/Sprites/picture.png" Width="33" Height="33" />
+                                        </Button>
+
+                                        <!-- Caption lines: one above the top row, one below the bottom
+                                             row, each bottom- or top-aligned inside its own band so it
+                                             hugs its tiles and is nowhere near the other row's. Each
+                                             spans the whole block and is slid sideways until it centres
+                                             under the hovered column - a name wider than its own 40px
+                                             column would be clipped to that column, and nothing is
+                                             beside it here to collide with. -->
+                                        <TextBlock x:Name="TopRowCaption" Grid.Row="0" Grid.ColumnSpan="3"
+                                                   VerticalAlignment="Bottom" Margin="0,0,0,2" Opacity="0"
+                                                   Style="{StaticResource QuickActionLabel}">
+                                            <TextBlock.RenderTransform>
+                                                <TranslateTransform x:Name="TopRowCaptionShift" />
+                                            </TextBlock.RenderTransform>
+                                        </TextBlock>
+
+                                        <TextBlock x:Name="BottomRowCaption" Grid.Row="4" Grid.ColumnSpan="3"
+                                                   VerticalAlignment="Top" Margin="0,2,0,0" Opacity="0"
+                                                   Style="{StaticResource QuickActionLabel}">
+                                            <TextBlock.RenderTransform>
+                                                <TranslateTransform x:Name="BottomRowCaptionShift" />
+                                            </TextBlock.RenderTransform>
+                                        </TextBlock>
+                                    </Grid>
+
+                                    <!-- Clock. It spans all three columns rather than sitting in the
+                                         middle one, so it lands on the island's centreline whatever
+                                         the two side blocks measure; because those blocks are the
+                                         same width, that also makes the gaps either side of the
+                                         digits equal. -->
+                                    <StackPanel Grid.Column="0" Grid.ColumnSpan="3"
+                                                VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <!-- Two runs instead of one string so the AM/PM designator can
+                                             be drawn smaller while still sitting on the digits' baseline.
+                                             No whitespace between the runs on purpose: the space that
+                                             separates them is the designator's own leading space, and
+                                             letting XAML insert another would double it. -->
+                                        <TextBlock Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                   FontSize="40" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Left"><Run x:Name="ClockTimeRun" Text="--:--" /><Run x:Name="ClockMeridiemRun" Text=" --" FontSize="20" /></TextBlock>
+                                        <TextBlock x:Name="DateText" Text=""
+                                                   Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                                   FontSize="13"
+                                                   Margin="3,3,0,0" HorizontalAlignment="Left" />
+                                    </StackPanel>
+
+                                    <!-- Usage, hard against the right edge and still the quietest
+                                         thing on the tab: worth a glance, never the reason to look
+                                         here. Its width is deliberately the same as the quick-action
+                                         block opposite, because the clock between them is centred -
+                                         equal blocks are what leave equal gaps on either side of it.
+                                         The fixed width also keeps the bars a legible length rather
+                                         than stretching them across whatever the column measures.
+                                         Like the media card, it is given the height it had before
+                                         the island grew for the Home tab's captions and centred in
+                                         the taller tab: its two halves split the height between them,
+                                         so otherwise they drift apart and the pair stops reading as
+                                         one block. -->
+                                    <Grid Grid.Column="2" Width="120" HorizontalAlignment="Right"
+                                          Height="88" VerticalAlignment="Center">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- CPU -->
+                                        <Grid Grid.Row="0" VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0" Text="CPU"
+                                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                       FontSize="11" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Left" />
+                                            <TextBlock x:Name="CpuPercentText" Grid.Row="0" Text="--%"
+                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                                       FontSize="10"
+                                                       HorizontalAlignment="Right" />
+
+                                            <Border x:Name="CpuTrack" Grid.Row="1" Height="4" CornerRadius="2"
+                                                    Background="#3D3D3D" Margin="0,3,0,0">
+                                                <Border x:Name="CpuFill" Height="4" CornerRadius="2"
+                                                        Background="White" HorizontalAlignment="Left" Width="0" />
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Memory -->
+                                        <Grid Grid.Row="1" VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0" Text="Memory"
+                                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                       FontSize="11" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Left" />
+                                            <TextBlock x:Name="MemoryPercentText" Grid.Row="0" Text="--%"
+                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                                       FontSize="10"
+                                                       HorizontalAlignment="Right" />
+
+                                            <Border x:Name="MemoryTrack" Grid.Row="1" Height="4" CornerRadius="2"
+                                                    Background="#3D3D3D" Margin="0,3,0,0">
+                                                <Border x:Name="MemoryFill" Height="4" CornerRadius="2"
+                                                        Background="White" HorizontalAlignment="Left" Width="0" />
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+
+                                <!-- Media tab. The card is deliberately compact - the artwork and the
+                                     transport buttons are pinned to the top and bottom of it, and
+                                     the volume slider centres in what is left - so left to itself it
+                                     stretches with the tab and the two halves drift apart. It is
+                                     given the height it had before the island grew to make room for
+                                     the Home tab's captions, and centred in the taller tab, so the
+                                     spacing is exactly what it always was. -->
+                                <Grid x:Name="MediaContent" Visibility="Collapsed"
+                                      Height="88" VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
                                         <!-- Media part (~70%) -->
                                         <ColumnDefinition Width="7*" />
@@ -241,7 +580,7 @@
                                             <Button x:Name="PlayPauseButton" Style="{StaticResource IconButton}"
                                                 Width="28" Height="28" Margin="8,0"
                                                 Click="PlayPause_Click">
-                                                <Image x:Name="PlayPause" Source="/Sprites/pause.png" />
+                                                <Image x:Name="PlayPause" Source="/Sprites/play.png" />
                                             </Button>
                                             <Button x:Name="NextButton" Style="{StaticResource IconButton}"
                                                 Width="28" Height="28" Margin="8,0"
@@ -256,7 +595,7 @@
                                                         HorizontalAlignment="Right" VerticalAlignment="Top"
                                                         Height="16" Width="16" Margin="0,0,8,4"
                                                         RenderOptions.BitmapScalingMode="HighQuality"
-                                                        Visibility="Visible" />
+                                                        Visibility="Collapsed" />
                                     </Grid>
 
                                     <!-- Separator between the media and device sides -->
@@ -361,6 +700,68 @@
                             </Grid>
                         </Grid>
                     </Grid>
+
+                    <!-- Quick-action confirmation. Blankets the whole island, tab strip included,
+                         so the only things clickable while an action is armed are these two
+                         buttons. Clicking anywhere else lands on Island_Click, which abandons it.
+                         A Border rather than a Grid purely so it can carry CornerRadius: a plain
+                         black rectangle would paint over the notches the island's rounded bottom
+                         corners leave open and square them off. Must match the Island Border. -->
+                    <Border x:Name="ConfirmOverlay" Background="Black" CornerRadius="0,0,20,20"
+                            Visibility="Collapsed">
+                        <!-- Prompt above the buttons, both centred. The text stretches to the width
+                             of the button row and centres itself over it. -->
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock x:Name="ConfirmPrompt" Text="Shut down?"
+                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                       FontSize="15" FontWeight="SemiBold"
+                                       TextAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                        Margin="0,10,0,0">
+                                <Button Content="Cancel" Style="{StaticResource ConfirmCancelButton}"
+                                        Click="ConfirmCancel_Click" />
+                                <Button x:Name="ConfirmAccept" Content="Shut down"
+                                        Style="{StaticResource ConfirmAcceptButton}"
+                                        Margin="8,0,0,0" Click="ConfirmAccept_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Link input. Blankets the island for the same reasons as the prompt above:
+                         the tab strip and the quick actions stay out of reach while it is open, and
+                         a click on the backdrop closes it. The placeholder is a TextBlock rather
+                         than a watermark because a TextBox has no placeholder of its own; it sits
+                         over the box, out of the way of hit testing. -->
+                    <Border x:Name="UrlOverlay" Background="Black" CornerRadius="0,0,20,20"
+                            Visibility="Collapsed"
+                            PreviewKeyDown="UrlOverlay_PreviewKeyDown">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Width="428">
+                            <Border Background="#1AFFFFFF" CornerRadius="10" Height="34">
+                                <Grid>
+                                    <TextBox x:Name="UrlBox"
+                                             Background="Transparent" BorderThickness="0"
+                                             Foreground="White" CaretBrush="White"
+                                             SelectionBrush="White" SelectionOpacity="0.35"
+                                             FontFamily="{StaticResource sf_regular}" FontSize="13"
+                                             Padding="10,0" VerticalContentAlignment="Center"
+                                             TextChanged="UrlBox_TextChanged" />
+                                    <TextBlock x:Name="UrlHint" Text="Paste or type a link"
+                                               Foreground="#FF7A7A7A" FontFamily="{StaticResource sf_regular}"
+                                               FontSize="13" Margin="11,0,0,0"
+                                               VerticalAlignment="Center" IsHitTestVisible="False" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                        Margin="0,10,0,0">
+                                <Button Content="Cancel" Style="{StaticResource ConfirmCancelButton}"
+                                        Click="UrlCancel_Click" />
+                                <Button Content="Shorten" Style="{StaticResource ConfirmAcceptButton}"
+                                        Margin="8,0,0,0" Click="UrlShorten_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </Grid>
 
                 <!-- Shown only when retracted AND hovered. Put custom peek content here. -->

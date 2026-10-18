@@ -52,7 +52,7 @@ namespace TopNotch {
             base.OnLostMouseCapture(e);
         }
 
-        private void UpdateValue(Point position)
+        private void UpdateValue(Point position) 
         {
             if (ActualWidth <= 0) return;
 

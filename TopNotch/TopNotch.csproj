@@ -25,10 +25,16 @@
     <None Remove="Sprites\Empty.png" />
     <None Remove="Sprites\forward.png" />
     <None Remove="Sprites\Headphones.png" />
+    <None Remove="Sprites\link.png" />
+    <None Remove="Sprites\lock.png" />
     <None Remove="Sprites\music_waveform.gif" />
     <None Remove="Sprites\pause.png" />
+    <None Remove="Sprites\picture.png" />
     <None Remove="Sprites\play.png" />
+    <None Remove="Sprites\power.png" />
+    <None Remove="Sprites\restart.png" />
     <None Remove="Sprites\skip.png" />
+    <None Remove="Sprites\sleep.png" />
     <None Remove="Sprites\SliderPill.png" />
   </ItemGroup>
 
@@ -85,13 +91,31 @@
     <Resource Include="Sprites\Headphones.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
+    <Resource Include="Sprites\link.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\lock.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
     <Resource Include="Sprites\music_waveform.gif">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Sprites\pause.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
+    <Resource Include="Sprites\picture.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
     <Resource Include="Sprites\play.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\power.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\restart.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\sleep.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
   </ItemGroup>
