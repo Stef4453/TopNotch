@@ -9,15 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Fonts\SFPRODISPLAYBLACKITALIC.OTF" />
-    <None Remove="Fonts\SFPRODISPLAYBOLD.OTF" />
-    <None Remove="Fonts\SFPRODISPLAYHEAVYITALIC.OTF" />
-    <None Remove="Fonts\SFPRODISPLAYLIGHTITALIC.OTF" />
-    <None Remove="Fonts\SFPRODISPLAYMEDIUM.OTF" />
-    <None Remove="Fonts\SFPRODISPLAYREGULAR.OTF" />
-    <None Remove="Fonts\SFPRODISPLAYSEMIBOLDITALIC.OTF" />
-    <None Remove="Fonts\SFPRODISPLAYTHINITALIC.OTF" />
-    <None Remove="Fonts\SFPRODISPLAYULTRALIGHTITALIC.OTF" />
+    <None Remove="Fonts\Inter-Italic-VariableFont_opsz,wght.ttf" />
+    <None Remove="Fonts\Inter-VariableFont_opsz,wght.ttf" />
     <None Remove="Sprites\audio.png" />
     <None Remove="Sprites\back.png" />
     <None Remove="Sprites\Bluetooth.png" />
@@ -36,6 +29,7 @@
     <None Remove="Sprites\skip.png" />
     <None Remove="Sprites\sleep.png" />
     <None Remove="Sprites\SliderPill.png" />
+    <None Remove="Sprites\tray.ico" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,31 +37,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Fonts\SFPRODISPLAYBLACKITALIC.OTF">
+    <!-- Inter is under the SIL Open Font License, which asks that the licence travel with the
+         font; the font itself is inside the assembly, so this is the copy that goes beside the
+         executable. -->
+    <None Update="Fonts\OFL.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Fonts\Inter-Italic-VariableFont_opsz,wght.ttf">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
-    <Resource Include="Fonts\SFPRODISPLAYBOLD.OTF">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Fonts\SFPRODISPLAYHEAVYITALIC.OTF">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Fonts\SFPRODISPLAYLIGHTITALIC.OTF">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Fonts\SFPRODISPLAYMEDIUM.OTF">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Fonts\SFPRODISPLAYREGULAR.OTF">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Fonts\SFPRODISPLAYSEMIBOLDITALIC.OTF">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Fonts\SFPRODISPLAYTHINITALIC.OTF">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="Fonts\SFPRODISPLAYULTRALIGHTITALIC.OTF">
+    <Resource Include="Fonts\Inter-VariableFont_opsz,wght.ttf">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Sprites\audio.png">
@@ -116,6 +98,9 @@
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Sprites\sleep.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\tray.ico">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
   </ItemGroup>

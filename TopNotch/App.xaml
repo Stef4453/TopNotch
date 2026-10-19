@@ -2,8 +2,15 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:TopNotch"
-             StartupUri="MainWindow.xaml">
+             ShutdownMode="OnExplicitShutdown">
     <Application.Resources>
-         
+        <!-- The widget's typeface, app-wide: the settings window is a window of the same app and
+             wears the same font, so it lives here rather than inside either window.
+
+             Inter, from the variable file in Fonts. WPF resolves the weight axis of a variable
+             font properly - Regular, SemiBold and Bold come out as three genuinely different
+             drawings rather than one drawing widened by the rasteriser - which is what the
+             island's 40px clock depends on. -->
+        <FontFamily x:Key="AppFont">/Fonts/#Inter</FontFamily>
     </Application.Resources>
 </Application>

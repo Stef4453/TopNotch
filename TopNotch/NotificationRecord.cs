@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows.Media.Imaging;
 
 namespace TopNotch
@@ -13,6 +14,12 @@ namespace TopNotch
         BitmapSource? Icon,
         DateTime Time)
     {
-        public string TimeText => Time.ToString("HH:mm");
+        /// <summary>
+        /// Written the way the clock is written - the same choice, from the same setting - so the
+        /// history never disagrees with the notch about what time it is.
+        /// </summary>
+        public string TimeText => Settings.Current.Use24HourClock
+            ? Time.ToString("HH:mm", CultureInfo.InvariantCulture)
+            : Time.ToString("h:mm tt", CultureInfo.InvariantCulture);
     }
 }

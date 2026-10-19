@@ -1,10 +1,13 @@
+using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -31,6 +34,11 @@ namespace TopNotch
 
         private DispatcherTimer? _topmostTimer;
 
+        // True while the file picker is up. The island normally insists on being the topmost of
+        // the topmost on every z-order change and every half second; while a dialog of its own is
+        // open, that is the one thing it must not do. See PickAppFor.
+        private bool _pickerOpen;
+
         private bool _updatingFromSystem;
 
         // Swipe transition state (text only)
@@ -39,16 +47,19 @@ namespace TopNotch
         private string? _pendingTitle;
         private string? _pendingArtist;
 
-        // Tab switching state
-        private enum Tab { Home, Media, History }
+        // Tab switching state. The order is the order of the strip, and the direction a switch
+        // slides: a tab to the right of the last one comes in from the right.
+        private enum Tab { Home, Media, History, Launchpad, Clipboard }
 
         private Tab _currentTab = Tab.Home;
         private bool _isTabAnimating;
 
-        // A quick action waiting on the user to confirm it. Null when nothing is armed.
+        // A quick action waiting on the user to confirm it. Null when nothing is armed. The prompt
+        // is not only for power actions - being asked for an API key uses the same two buttons -
+        // so what is remembered is the consequence itself rather than which action it was.
         private enum PowerAction { Shutdown, Restart, Sleep, Lock }
 
-        private PowerAction? _pendingPowerAction;
+        private Action? _pendingConfirm;
 
         // Notification history for the current session only (newest first).
         private readonly ObservableCollection<NotificationRecord> _history = new();
@@ -71,6 +82,7 @@ namespace TopNotch
         private readonly BitmapImage _playIcon = LoadIcon("play.png");
         private readonly BitmapImage _pauseIcon = LoadIcon("pause.png");
         private readonly BitmapImage _linkIcon = LoadIcon("link.png");
+        private readonly BitmapImage _imageIcon = LoadIcon("picture.png");
         private readonly BitmapImage _emptyArt = LoadIcon("empty.png", 128);
         private readonly BitmapImage _audioIcon = LoadIcon("audio.png", 128);
         private readonly BitmapImage _bluetoothAudioIcon = LoadIcon("bluetooth_audio.png", 128);
@@ -91,8 +103,19 @@ namespace TopNotch
             ShowTabContent(Tab.Home);
             UpdateClock();                  // so the clock isn't blank until the first tick
 
+            // The settings window is the only writer of the settings; the island just keeps up.
+            Settings.Changed += OnSettingsChanged;
+
             HistoryList.ItemsSource = _history;
             HistoryEmpty.Visibility = Visibility.Visible;   // nothing recorded yet
+
+            // The tiles are the store's own list rather than a copy of it, so putting an app in a
+            // slot is something the grid simply sees.
+            LaunchpadList.ItemsSource = Launchpad.Current.Slots;
+
+            // The board is the store's own list for the same reason the tiles are: a file left on
+            // it is something the Canvas simply sees.
+            ClipboardList.ItemsSource = Pinboard.Current.Files;
 
             _media.TrackChanged += (title, artist) => Dispatcher.Invoke(() =>
             {
@@ -130,6 +153,16 @@ namespace TopNotch
             });
 
             UpdateContentVisibility();
+
+            // The island is built at the size everything inside it is measured against - the expanded
+            // one - and then put where its shape rests, before the window is ever on screen. Left as
+            // it was built it would be a black rectangle across the top of the screen until the first
+            // hover took it away.
+            _summonTimer.Tick += SummonTimer_Tick;
+            _hoverNameTimer.Tick += HoverNameTimer_Tick;
+            Island.Width = PeekWidth;
+            Island.Height = PeekHeight;
+            ApplyStyle(instant: true);
         }
 
         // Keep this overlay out of Alt-Tab and make it non-activatable, so it can never
@@ -160,9 +193,10 @@ namespace TopNotch
             _topmostTimer.Start();
         }
 
-        private static IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        // Not static: while the picker is up the hook has to keep its hands off - see _pickerOpen.
+        private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            if (msg == WM_WINDOWPOSCHANGING)
+            if (msg == WM_WINDOWPOSCHANGING && !_pickerOpen)
             {
                 var pos = Marshal.PtrToStructure<WINDOWPOS>(lParam);
                 pos.hwndInsertAfter = HWND_TOPMOST;
@@ -174,6 +208,8 @@ namespace TopNotch
 
         private void ForceTopmost()
         {
+            if (_pickerOpen) return;
+
             var hwnd = new WindowInteropHelper(this).Handle;
             if (hwnd != IntPtr.Zero)
                 SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -302,17 +338,21 @@ namespace TopNotch
 
         private static readonly Duration BarDuration = TimeSpan.FromMilliseconds(450);
 
-        // Day-and-month with the month spelled out, and a 12-hour clock, deliberately in the
-        // invariant culture: the rest of the UI is English, and "tt" is what guarantees a literal
-        // AM/PM designator instead of a locale-specific one.
+        // Day-and-month with the month spelled out, deliberately in the invariant culture: the rest
+        // of the UI is English, and "tt" is what guarantees a literal AM/PM designator instead of a
+        // locale-specific one. Whether the designator is there at all is the user's call - General
+        // in the settings window - which is why both formats are spelled out here rather than
+        // being derived from the machine's own idea of a clock.
         private void UpdateClock()
         {
             var now = DateTime.Now;
+            bool military = Settings.Current.Use24HourClock;
 
             // Time and designator are separate runs so the designator renders smaller; the run
-            // supplies its own leading space to keep the two apart.
-            string time = now.ToString("h:mm", CultureInfo.InvariantCulture);
-            string meridiem = " " + now.ToString("tt", CultureInfo.InvariantCulture);
+            // supplies its own leading space to keep the two apart, and in 24-hour time it is
+            // emptied outright rather than left to draw nothing.
+            string time = now.ToString(military ? "HH:mm" : "h:mm", CultureInfo.InvariantCulture);
+            string meridiem = military ? "" : " " + now.ToString("tt", CultureInfo.InvariantCulture);
             string date = now.ToString("d MMMM", CultureInfo.InvariantCulture);
 
             // The timer runs every second but the text only changes once a minute, so skip the
@@ -320,6 +360,21 @@ namespace TopNotch
             if (ClockTimeRun.Text != time) ClockTimeRun.Text = time;
             if (ClockMeridiemRun.Text != meridiem) ClockMeridiemRun.Text = meridiem;
             if (DateText.Text != date) DateText.Text = date;
+        }
+
+        // The settings window writes a change and announces it; the island's half of that is to
+        // redraw the two things in it that are written as times - and to change its own shape, if
+        // that is what was changed. Only a real change is acted on: the clock's format being
+        // rewritten is no reason to move the island around the screen.
+        private void OnSettingsChanged()
+        {
+            // A change of outline is not a change of shape: the island stays where it is and only
+            // its edge is redrawn. Anything else about the shape means it has to be placed again.
+            if (_appliedStyle != Settings.Current.IslandStyle) ApplyStyle();
+            else if (_appliedOutline != Settings.Current.IslandOutline) ApplyOutline();
+
+            UpdateClock();
+            HistoryList.Items.Refresh();   // the history's own timestamps follow the same choice
         }
 
         private void UpdateSystemStats(double cpuPercent, double memoryPercent)
@@ -366,20 +421,27 @@ namespace TopNotch
         // "Share Image" - gets clipped to the column it is handed.
         // Each animation starts from the line's current opacity rather than from a fixed value, or
         // moving from one tile to the next would blink the caption away before fading it back in.
-        private void QuickAction_PointerEnter(object sender, MouseEventArgs e)
+        private void QuickAction_PointerEnter(object sender, MouseEventArgs e) =>
+            ShowCaption((System.Windows.Controls.Button)sender);
+
+        // The caption machinery, per tile. The pointer is its usual driver; a drag reaching the
+        // island is the other, because an OLE drag keeps the mouse to itself and the enter events
+        // a hover would have raised never arrive.
+        private void ShowCaption(System.Windows.Controls.Button tile)
         {
-            var button = (System.Windows.Controls.Button)sender;
-            bool top = System.Windows.Controls.Grid.GetRow(button) == 1;
+            bool top = System.Windows.Controls.Grid.GetRow(tile) == 1;
             var line = top ? TopRowCaption : BottomRowCaption;
             var shift = top ? TopRowCaptionShift : BottomRowCaptionShift;
 
-            line.Text = button.Tag as string ?? string.Empty;
-            shift.X = (System.Windows.Controls.Grid.GetColumn(button) - 1) * 40;
+            line.Text = tile.Tag as string ?? string.Empty;
+            shift.X = (System.Windows.Controls.Grid.GetColumn(tile) - 1) * 40;
             FadeCaption(line, 1, 120);
             FadeCaption(top ? BottomRowCaption : TopRowCaption, 0, 120);
         }
 
-        private void QuickAction_PointerLeave(object sender, MouseEventArgs e)
+        private void QuickAction_PointerLeave(object sender, MouseEventArgs e) => HideCaptions();
+
+        private void HideCaptions()
         {
             FadeCaption(TopRowCaption, 0, 180);
             FadeCaption(BottomRowCaption, 0, 180);
@@ -405,11 +467,19 @@ namespace TopNotch
 
         private void AskToConfirm(PowerAction action)
         {
-            _pendingPowerAction = action;
-
             string name = ActionName(action);
-            ConfirmPrompt.Text = name + "?";
-            ConfirmAccept.Content = name;
+            AskToConfirm(name + "?", name, () => RunPowerAction(action));
+        }
+
+        // One prompt, two callers: a power action about to happen, and a feature that cannot run
+        // without an API key. Both need the same thing - a line of text and two buttons - so the
+        // prompt takes its own wording and its own consequence rather than knowing about either.
+        private void AskToConfirm(string prompt, string accept, Action consequence)
+        {
+            _pendingConfirm = consequence;
+
+            ConfirmPrompt.Text = prompt;
+            ConfirmAccept.Content = accept;
 
             // Drop any fade-out still running first: its Completed handler would otherwise
             // collapse the overlay again a moment after showing it. The overlay is hit-testable
@@ -425,7 +495,7 @@ namespace TopNotch
         // Also reached by clicking off the prompt, so the island is never left armed out of sight.
         private void DismissConfirm()
         {
-            _pendingPowerAction = null;
+            _pendingConfirm = null;
 
             var fade = new DoubleAnimation(0, ConfirmFade)
             {
@@ -440,10 +510,11 @@ namespace TopNotch
 
         private void ConfirmAccept_Click(object sender, RoutedEventArgs e)
         {
-            if (_pendingPowerAction is not PowerAction action) return;
+            var consequence = _pendingConfirm;
+            if (consequence is null) return;
 
             DismissConfirm();   // drop the prompt first, so nothing is left showing if this fails
-            RunPowerAction(action);
+            consequence();
         }
 
         private static void RunPowerAction(PowerAction action)
@@ -518,7 +589,7 @@ namespace TopNotch
 
         // Tab switching
 
-        // The active tab is marked twice over: brighter than the others, and underlined. All three
+        // The active tab is marked twice over: brighter than the others, and underlined. All the
         // underlines are laid out from the start and only their opacity changes, so switching tabs
         // never re-measures the strip and the labels stay put.
         private void UpdateTabHighlight(Tab active)
@@ -527,10 +598,14 @@ namespace TopNotch
             HomeTab.Foreground = active == Tab.Home ? System.Windows.Media.Brushes.White : inactive;
             MediaTab.Foreground = active == Tab.Media ? System.Windows.Media.Brushes.White : inactive;
             HistoryTab.Foreground = active == Tab.History ? System.Windows.Media.Brushes.White : inactive;
+            LaunchpadTab.Foreground = active == Tab.Launchpad ? System.Windows.Media.Brushes.White : inactive;
+            ClipboardTab.Foreground = active == Tab.Clipboard ? System.Windows.Media.Brushes.White : inactive;
 
             FadeUnderline(HomeUnderline, active == Tab.Home);
             FadeUnderline(MediaUnderline, active == Tab.Media);
             FadeUnderline(HistoryUnderline, active == Tab.History);
+            FadeUnderline(LaunchpadUnderline, active == Tab.Launchpad);
+            FadeUnderline(ClipboardUnderline, active == Tab.Clipboard);
         }
 
         private static void FadeUnderline(UIElement underline, bool on) =>
@@ -544,6 +619,16 @@ namespace TopNotch
             HomeContent.Visibility = tab == Tab.Home ? Visibility.Visible : Visibility.Collapsed;
             MediaContent.Visibility = tab == Tab.Media ? Visibility.Visible : Visibility.Collapsed;
             HistoryContent.Visibility = tab == Tab.History ? Visibility.Visible : Visibility.Collapsed;
+            LaunchpadContent.Visibility = tab == Tab.Launchpad ? Visibility.Visible : Visibility.Collapsed;
+            ClipboardContent.Visibility = tab == Tab.Clipboard ? Visibility.Visible : Visibility.Collapsed;
+
+            // Opening the Launchpad is the one moment there is something to explain about it.
+            if (tab == Tab.Launchpad) ShowLaunchpadIntroIfNew();
+
+            // The board holds its files inside itself when it comes into view, which is when it has
+            // the size it is really going to be rather than one it is passing through on the way
+            // open. Anything written down outside the board is brought back inside it here.
+            if (tab == Tab.Clipboard) Pinboard.Current.HoldAll();
         }
 
         private async void Tab_Click(object sender, RoutedEventArgs e)
@@ -552,7 +637,9 @@ namespace TopNotch
 
             Tab target = sender == HomeTab ? Tab.Home
                        : sender == MediaTab ? Tab.Media
-                       : Tab.History;
+                       : sender == HistoryTab ? Tab.History
+                       : sender == LaunchpadTab ? Tab.Launchpad
+                       : Tab.Clipboard;
             if (target == _currentTab || _isTabAnimating) return;
 
             Tab previous = _currentTab;
@@ -634,20 +721,114 @@ namespace TopNotch
             TabContentHost.BeginAnimation(OpacityProperty, fadeOut);
         }
 
-        // Island animation
+        // ---- Island shape and motion ----
 
-        private const double RestY = -20;
-        private const double HoverY = 0;
         private const double ExpandedWidth = 460;
         private const double ExpandedHeight = 142;
         private const double PeekWidth = 160;
         private const double PeekHeight = 32;
+
+        // The island's top three pixels are off the top of the screen, which is what makes the notch
+        // borderless. The markup gives the zone holding it a -3 margin; everything here is measured
+        // from there.
+        private const double EdgeOverlap = 3;
+
+        // Where each shape rests, and where it sits when it is out. The notch keeps a sliver of
+        // itself showing - that sliver is the notch, and a notch that came and went would be a
+        // strange thing to have on a desktop - so "away" for it is twelve pixels of black hanging
+        // off the top of the screen. The floating pill goes right off the screen instead, because a
+        // pill with nothing to show is a black blob over whatever you were doing.
+        private const double NotchRestY = -20;
+        private const double PillGap = 10;   // clear air between the pill and the top of the screen
+
+        private double HoverY => Floating ? EdgeOverlap + PillGap : 0;
+
+        // Away is not a fixed offset: the island is asked to leave the screen while it may still be
+        // as tall as a panel on its way back to being a capsule, and how far off it has to go
+        // depends on how tall it is at the time.
+        private double RestY => Floating ? EdgeOverlap - Math.Max(Island.Height, PeekHeight) - 10
+                                         : NotchRestY;
 
         // A notification banner is as long as the expanded island but a fixed 66 tall. It used to be
         // "half the island", which stopped meaning anything once the island grew to make room for the
         // quick-action captions - the banner is its own thing and should not follow that.
         private const double NotificationWidth = ExpandedWidth;
         private const double NotificationHeight = 66;
+
+        // Which of the two shapes is being worn. Read from the settings rather than cached: the only
+        // thing that ever changes it is a change made in the settings window, which says so.
+        private static bool Floating => Settings.Current.IslandStyle == IslandStyle.DynamicIsland;
+
+        // Whether the floating pill is out of its hole. Kept as a flag rather than read back off the
+        // transform, because the transform is in flight for the length of every animation and both
+        // the peek's contents and the pointer's arrival are decided in its first frame.
+        private bool _pillOut;
+
+        // Whether it is on its way back in. The peek's contents stay on screen for the whole
+        // journey: a pill that empties itself and then slides away reads as a black rectangle
+        // leaving, which is the one thing this shape is meant not to look like. So the flag that
+        // ends the peek is cleared when the slide finishes rather than when it starts - and this
+        // one is also what stops the summon timer asking for the same journey ten times a second.
+        private bool _pillLeaving;
+
+        // The shape the island is currently wearing, so that a change to something else - the clock's
+        // format - does not reshuffle it.
+        private IslandStyle _appliedStyle;
+
+        // Whether that shape was last drawn with its hairline on, held for the same reason.
+        private bool _appliedOutline;
+
+        // The floating pill shows nothing at rest, which also means there is not a pixel of ours for
+        // the pointer to touch: nothing in the window can tell us the pointer has arrived. So the
+        // pointer is asked for instead, which costs a few reads a second and cannot swallow a click
+        // the way an invisible strip along the top of the screen would.
+        private readonly DispatcherTimer _summonTimer = new(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(110)
+        };
+
+        // How much of the top of the screen belongs to the island: wide enough to be found without
+        // aiming, and no wider than the thing being aimed at.
+        private const double ReachWidth = 280;
+
+        private void SummonTimer_Tick(object? sender, EventArgs e)
+        {
+            bool reaching = PointerAtIsland();
+
+            // Out covers both the pill that is here and the one on its way back in: a pointer that
+            // arrives mid-retract turns it around, rather than letting it carry on out from under
+            // the hand that reached for it. Nothing is asked for twice, either - the timer runs ten
+            // times a second and a slide takes three - so each of these waits for the other.
+            if (reaching && (!_pillOut || _pillLeaving))
+            {
+                ShowIsland();
+                UpdateContentVisibility();
+            }
+            else if (!reaching && _pillOut && !_pillLeaving && !Held)
+            {
+                HideIsland();
+            }
+        }
+
+        // Whether the pointer is reaching for the island. Two things count: being in the strip along
+        // the top of the screen the pill drops into, and - while a drag is under way - being anywhere
+        // the pill would be, because a drag cannot hover and the pill has to be there before a
+        // picture can be dropped on it.
+        private static bool PointerAtIsland()
+        {
+            if (!GetCursorPos(out POINT point)) return false;
+            if (Math.Abs(point.X - SystemParameters.PrimaryScreenWidth / 2) > ReachWidth / 2) return false;
+
+            if (point.Y <= EdgeOverlap + PillGap) return true;
+
+            return point.Y <= EdgeOverlap + PillGap + PeekHeight
+                   && (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+        }
+
+        // On screen for a reason of its own: the pointer is on it, it has been opened, or it is
+        // showing something that has to be read. Anything else and the floating pill is free to go.
+        private bool Held => _hovered || _expanded || _notifying || _dismissing || _urlInputOpen
+                             || ConfirmOverlay.Visibility == Visibility.Visible;
 
         private readonly NotificationService _notification = new();
         private readonly DispatcherTimer _notifyTimer = new() { Interval = TimeSpan.FromSeconds(5) };
@@ -661,7 +842,7 @@ namespace TopNotch
             _hovered = true;
             UpdateContentVisibility();
             if (_notifying) return;   // the banner owns the island until it's dismissed
-            MoveIsland(HoverY);
+            ShowIsland();
         }
 
         private void Zone_MouseLeave(object sender, MouseEventArgs e)
@@ -669,23 +850,77 @@ namespace TopNotch
             _hovered = false;
             UpdateContentVisibility();
             if (_notifying) return;
-            MoveIsland(RestY);
+
+            // The floating pill is not put away on the strength of the pointer leaving it: what
+            // matters is where the pointer went, which hover alone cannot say. The summon timer
+            // knows, and it is the only thing that takes the pill away.
+            if (Floating) return;
+
+            HideIsland();
         }
 
-        // Slides the island into view (hover) or up out of sight (rest).
-        private void MoveIsland(double targetY)
+        // The island is either out where it can be seen and reached, or away. Everything that moves
+        // it asks for one of those two rather than for a coordinate, so that where "away" is can
+        // depend on the shape and on how tall the island is at the time.
+        private void ShowIsland()
         {
-            if (!_expanded)
-                SlideIsland(targetY);
+            _pillLeaving = false;
+            _pillOut = true;
+            SlideIsland(HoverY);
         }
 
-        private void SlideIsland(double targetY)
+        // Nothing is put away while the panel is open: an opened island stays open until it is
+        // clicked shut, and the pointer wandering off is not a reason to take it away from someone
+        // who is reading it.
+        private void HideIsland()
         {
-            var anim = new DoubleAnimation(targetY, TimeSpan.FromMilliseconds(250))
+            // Once is enough: the summon timer asks for this every 110 milliseconds while the
+            // pointer is away, and a second slide would start the journey again from wherever this
+            // one has got to, which is how a retract ends up making no headway at all.
+            if (_expanded || _pillLeaving) return;
+            _pillLeaving = true;
+
+            SlideIsland(RestY, () =>
             {
-                EasingFunction = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 }
-            };
-            IslandShift.BeginAnimation(TranslateTransform.YProperty, anim);
+                // A fresh arrival may have taken the island over while this slide was running, and
+                // its own flag is what says whether it did.
+                if (!_pillLeaving) return;
+
+                _pillLeaving = false;
+                _pillOut = false;
+                UpdateContentVisibility();
+            });
+        }
+
+        private void SlideIsland(double targetY, Action? done = null)
+        {
+            // The two shapes arrive and leave differently. The notch is already touching the top of
+            // the screen, so all it has to do is move. The pill has further to come and further to
+            // go, and the motion is most of what makes that read as arriving and being taken away
+            // rather than as a black rectangle changing place: it springs in, and it whips away.
+            TimeSpan duration;
+            EasingFunctionBase ease;
+
+            if (!Floating)
+            {
+                duration = TimeSpan.FromMilliseconds(250);
+                ease = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.4 };
+            }
+            else if (targetY == HoverY)
+            {
+                duration = TimeSpan.FromMilliseconds(340);
+                ease = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.5 };
+            }
+            else
+            {
+                duration = TimeSpan.FromMilliseconds(300);
+                ease = new CubicEase { EasingMode = EasingMode.EaseIn };
+            }
+
+            var slide = new DoubleAnimation(targetY, duration) { EasingFunction = ease };
+            if (done is not null) slide.Completed += (_, _) => done();
+
+            IslandShift.BeginAnimation(TranslateTransform.YProperty, slide);
         }
 
         private void AnimateIslandSize(double width, double height)
@@ -699,13 +934,85 @@ namespace TopNotch
 
         private void UpdateContentVisibility()
         {
+            ForgetHoverName();
+
             // A live (or still-fading) banner overrides everything else; otherwise the expanded
             // tabbed UI shows, or the peek panel when retracted and hovered.
             bool banner = _notifying || _dismissing;
 
+            // The floating pill has no hover of its own to wait for - being out at all is what it
+            // means to be present - so its peek shows for as long as it is on screen.
+            bool peeking = _hovered || (Floating && _pillOut);
+
             NotificationContent.Visibility = banner ? Visibility.Visible : Visibility.Collapsed;
             ExpandedContent.Visibility = (!banner && _expanded) ? Visibility.Visible : Visibility.Collapsed;
-            PeekContent.Visibility = (!banner && !_expanded && _hovered) ? Visibility.Visible : Visibility.Collapsed;
+            PeekContent.Visibility = (!banner && !_expanded && peeking) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // ---- Shape ----
+
+        // The hairline the island is drawn with, when it is drawn with one: black against a dark
+        // desktop would otherwise have no edge of its own at all.
+        private static readonly Brush OutlineEdge = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3D));
+
+        // Everything that differs between the two shapes is decided here: how round the island is,
+        // whether it floats clear of the screen, and whether anything has to watch for the pointer.
+        // Called once when the island is built and again whenever the settings window changes the
+        // choice, so that flipping it lands on the widget straight away rather than at the next start.
+        private void ApplyStyle(bool instant = false)
+        {
+            _appliedStyle = Settings.Current.IslandStyle;
+
+            // The notch is square where it runs off the top of the screen - there is no corner there
+            // to round - while the pill is round all the way round. Sixteen is the most that leaves
+            // the retracted pill a capsule, which is the shape the whole idea is borrowed from. The
+            // two overlays paint over the island's own corners, so they have to match it.
+            var corner = Floating ? new CornerRadius(PeekHeight / 2) : new CornerRadius(0, 0, 20, 20);
+
+            Island.CornerRadius = corner;
+            ConfirmOverlay.CornerRadius = corner;
+            UrlOverlay.CornerRadius = corner;
+
+            ApplyOutline();
+
+            if (Floating) _summonTimer.Start();
+            else _summonTimer.Stop();
+
+            // Put it where the new shape rests. Anything with a reason of its own to be on screen
+            // stays there, which is the same rule the pointer is held to: the island is out to be
+            // looked at, or it is away.
+            //
+            // This does not go through the pair below. Those ask for a journey and refuse one
+            // already under way, which is right for a pointer arriving and leaving, but a change of
+            // shape is neither: the island has to reach the new shape's resting place whatever it
+            // happened to be doing when the choice was made.
+            _pillLeaving = false;
+            _pillOut = Held;
+
+            if (instant)
+            {
+                IslandShift.BeginAnimation(TranslateTransform.YProperty, null);
+                IslandShift.Y = Held ? HoverY : RestY;
+            }
+            else
+            {
+                SlideIsland(Held ? HoverY : RestY);
+            }
+
+            UpdateContentVisibility();
+        }
+
+        // The hairline, on or off, for whichever shape is worn. A shadow would do the job more
+        // handsomely, but a shadow is drawn outside the island, and outside the island is where this
+        // window's pixels have to stay clear: it is the transparent ones that let a click through to
+        // whatever is behind. So the edge is drawn inside, and it follows the rounded corners with it.
+        private void ApplyOutline()
+        {
+            bool on = Settings.Current.IslandOutline;
+            _appliedOutline = on;
+
+            Island.BorderThickness = on ? new Thickness(1) : new Thickness(0);
+            Island.BorderBrush = on ? OutlineEdge : null;
         }
 
         private void Island_Click(object sender, MouseButtonEventArgs e)
@@ -735,6 +1042,127 @@ namespace TopNotch
             _expanded = !_expanded;
             UpdateContentVisibility();
             AnimateIslandSize(_expanded ? ExpandedWidth : PeekWidth, _expanded ? ExpandedHeight : PeekHeight);
+        }
+
+        // ---- The name of what the pointer is on ----
+
+        // WPF's own tooltips never open here. The island is a window that is deliberately never
+        // activated - it is not in the taskbar or Alt-Tab, and clicking it does not take the
+        // keyboard away from whatever had it - and the tooltip service will not show one without an
+        // active window. So the name of the thing under the pointer is drawn by the island itself:
+        // the same dark plate a tooltip would have been, in the same place, and only after the
+        // pointer has rested on something for long enough to be asking what it is.
+        //
+        // The names are not gathered here: the item templates already put one on each tile as its
+        // tool tip, which is where a name belongs, and this reads it back. The tool tip service is
+        // switched off on those same elements so that WPF never draws its own as well - one plate,
+        // drawn by the island, in the island's own style.
+        private readonly DispatcherTimer _hoverNameTimer = new(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(380)
+        };
+
+        private string? _hoverName;   // what the pointer has come to rest on, if anything
+        private Point _hoverAt;       // where it was when it settled there
+
+        private void Island_MouseMove(object sender, MouseEventArgs e)
+        {
+            // Nothing is named while a button is down: dragging across the board or the launchpad is
+            // not a person asking what any of it is called.
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                RestedOn(null, e);
+                return;
+            }
+
+            // Found by walking up from whatever was hit, so that every item in the island is covered
+            // by this one rule rather than each kind of tile wiring up a hover of its own.
+            string? name = null;
+
+            for (var at = Island.InputHitTest(e.GetPosition(Island)) as DependencyObject;
+                 at is not null && at != Island;
+                 at = ParentOf(at))
+            {
+                if (at is FrameworkElement { ToolTip: string tip } && tip.Length > 0)
+                {
+                    name = tip;
+                    break;
+                }
+            }
+
+            RestedOn(name, e);
+        }
+
+        private void Island_MouseLeave(object sender, MouseEventArgs e) => RestedOn(null, e);
+
+        // The step up the tree from something that was hit. Almost everything in the island is a
+        // visual, but text is not: a line of it is a Run, which is a content element, and content
+        // elements have no place in the visual tree at all - asking that tree for their parent
+        // throws rather than answering, which is what used to take the whole window down the moment
+        // the pointer crossed a line of text. Text is stepped over to the element that holds it,
+        // and the walk carries on from there. Anything else the walk cannot climb stops it, which
+        // is the same answer as reaching the top.
+        private static DependencyObject? ParentOf(DependencyObject at)
+        {
+            if (at is FrameworkContentElement text) return text.Parent;
+
+            return at is Visual ? VisualTreeHelper.GetParent(at) : null;
+        }
+
+        // Records what the pointer has settled on and starts the wait. Going from one thing to
+        // another starts it again; moving about within the same thing does not, which is what lets
+        // the name stay up while the hand settles.
+        private void RestedOn(string? name, MouseEventArgs e)
+        {
+            if (name == _hoverName)
+            {
+                if (name is not null) _hoverAt = e.GetPosition(HoverCanvas);
+                return;
+            }
+
+            _hoverName = name;
+            _hoverNameTimer.Stop();
+            HideHoverName();
+
+            if (name is null) return;
+
+            _hoverAt = e.GetPosition(HoverCanvas);
+            _hoverNameTimer.Start();
+        }
+
+        private void HoverNameTimer_Tick(object? sender, EventArgs e)
+        {
+            _hoverNameTimer.Stop();
+            if (_hoverName is not { } name) return;
+
+            HoverNameText.Text = name;
+
+            // Measured before it is placed, because where it fits depends on how big it is. It is
+            // made visible for the measure and placed in the same frame, so it is never painted in
+            // the wrong place.
+            HoverName.Visibility = Visibility.Visible;
+            HoverName.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            Size size = HoverName.DesiredSize;
+
+            // Below and to the right of the pointer, as a tooltip is, and slid back inside the
+            // island where that would hang it over the edge.
+            Canvas.SetLeft(HoverName, Math.Max(0, Math.Min(_hoverAt.X + 14, HoverCanvas.ActualWidth - size.Width)));
+            Canvas.SetTop(HoverName, Math.Max(0, Math.Min(_hoverAt.Y + 20, HoverCanvas.ActualHeight - size.Height)));
+        }
+
+        private void HideHoverName()
+        {
+            if (HoverName.Visibility != Visibility.Visible) return;
+            HoverName.Visibility = Visibility.Collapsed;
+        }
+
+        // A change of what the island is showing is a change of what the pointer is over, and the
+        // name of the old thing has no business floating over the new one.
+        private void ForgetHoverName()
+        {
+            _hoverName = null;
+            _hoverNameTimer.Stop();
+            HideHoverName();
         }
 
         // ---- Notifications ----
@@ -789,7 +1217,7 @@ namespace TopNotch
                 _restoreHeight = double.IsNaN(Island.Height) ? ExpandedHeight : Island.Height;
 
                 AnimateIslandSize(NotificationWidth, NotificationHeight);
-                SlideIsland(HoverY);   // a resting island should come fully on screen
+                ShowIsland();   // a resting island should come fully on screen
             }
 
             _notifying = true;
@@ -814,7 +1242,7 @@ namespace TopNotch
             _notifying = false;
             _dismissing = true;          // keep the banner painted while it fades
             AnimateIslandSize(_restoreWidth, _restoreHeight);
-            MoveIsland(_hovered ? HoverY : RestY);
+            if (_hovered) ShowIsland(); else HideIsland();
             UpdateContentVisibility();
 
             var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(180))
@@ -991,6 +1419,669 @@ namespace TopNotch
             }
         }
 
+        // ---- A drop on the island ----
+
+        // Whether the island was open when a drag arrived, so that a drag which is taken
+        // somewhere else leaves the notch as it found it instead of having opened it for nothing.
+        private bool _wasExpandedBeforeDrag = true;
+
+        private void ShareImage_Click(object sender, RoutedEventArgs e)
+        {
+            // The click is the explanation, not the feature: a picture arrives by being dropped.
+            // Without a key there is nothing to explain yet, so that is what is asked for first.
+            if (!Settings.Current.HasImgBbApiKey)
+            {
+                AskForKey();
+                return;
+            }
+
+            ShowBanner("Share an image",
+                "Drop a picture on the notch and the link lands on your clipboard", _imageIcon);
+        }
+
+        // The whole island takes a picture's drop rather than the 36x30 tile the action belongs to:
+        // a picture is dragged by its own ghost under the pointer, and landing that on a tile that
+        // size would be a game of skill. The tile's caption - shown for the length of the drag - is
+        // what says which action the drop will be taken as.
+        //
+        // The Launchpad is the other way round. There the tiles are the point, and the grid is the
+        // map of where a dropped file will land, so a file dropped on that tab goes to the tile it
+        // was aimed at, which is lit while the pointer is over it.
+        private void Island_DragOver(object sender, DragEventArgs e)
+        {
+            if (_currentTab == Tab.Launchpad && DroppedApp(e) is not null)
+            {
+                // A file arriving on a tab that has never been opened is the tab explaining
+                // itself. The page of instructions gives way to the thing it describes.
+                HideLaunchpadIntro(fade: false);
+
+                e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+
+                OpenForDrop();
+                HighlightSlot(SlotAt(e));
+                return;
+            }
+
+            // Files already on the board do not count: a file carried out of the island and brought
+            // back to it is still on the board, and the island should say so rather than offer to
+            // take it a second time.
+            bool arriving = DroppedFiles(e)?.Any(file => !Pinboard.Current.Has(file)) == true;
+
+            if (_currentTab == Tab.Clipboard && (arriving || WebImage.Carried(e.Data)))
+            {
+                // Any file at all is taken here, and taken anywhere on the panel: the board is the
+                // whole of it, so the whole of it lights up rather than one tile of it. A picture
+                // dragged out of a page counts as a file too, once the page has handed it over.
+                e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+
+                OpenForDrop();
+                HighlightBoard(true);
+                return;
+            }
+
+            if (DroppedImage(e) is null && !WebImage.Carried(e.Data))
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+                HighlightSlot(null);
+                return;
+            }
+
+            // On the board, a file that is already there is not an offer to upload anywhere: it is
+            // simply already there, and the island says so rather than turning the same drag into
+            // something else on its way past.
+            if (_currentTab == Tab.Clipboard && DroppedFiles(e) is not null)
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = true;
+                HighlightSlot(null);
+                HighlightBoard(false);
+                return;
+            }
+
+            e.Effects = DragDropEffects.Copy;
+            e.Handled = true;
+
+            OpenForDrop();
+
+            // This fires continuously while the pointer moves. Re-showing the caption each time is
+            // also what keeps it up: any tile the pointer crosses would otherwise have cleared it.
+            ShowCaption(ShareImageButton);
+        }
+
+        // Opened on the way in. The tiles a drop is aimed at live on the expanded island, and a drag
+        // cannot hover, so otherwise a picture - or an app - would be coming down on a bare 160px
+        // sliver with nothing on it to aim at.
+        private void OpenForDrop()
+        {
+            if (_expanded) return;
+
+            _wasExpandedBeforeDrag = false;
+            _expanded = true;
+            UpdateContentVisibility();
+            AnimateIslandSize(ExpandedWidth, ExpandedHeight);
+            ShowIsland();   // it sits off the top of the screen while collapsed
+        }
+
+        private void Island_DragLeave(object sender, DragEventArgs e)
+        {
+            EndDrag();
+        }
+
+        // Puts the island back the way a drag found it. Two ways a drag can end with no picture to
+        // show for it: leaving the island again, and being dropped on it carrying something else
+        // entirely (a drag that wandered in mid-flight, text, a folder). Both leave an open panel
+        // behind otherwise, which on the notch reads as untidy and on the floating pill reads as a
+        // black rectangle parked over the middle of the desktop.
+        private void EndDrag()
+        {
+            HideCaptions();
+            HighlightSlot(null);
+            HighlightBoard(false);
+
+            if (_wasExpandedBeforeDrag) return;
+            _wasExpandedBeforeDrag = true;
+
+            _expanded = false;
+            UpdateContentVisibility();
+            AnimateIslandSize(PeekWidth, PeekHeight);
+            HideIsland();
+        }
+
+        private void Island_Drop(object sender, DragEventArgs e)
+        {
+            e.Handled = true;
+
+            if (_currentTab == Tab.Launchpad && DroppedApp(e) is { } app)
+            {
+                LaunchpadSlot? slot = SlotAt(e);
+                HighlightSlot(null);
+
+                // A drop that landed between two tiles has nowhere to go: the tiles are the targets,
+                // and the one that lit up on the way in is the one that was aimed at.
+                if (slot is null)
+                {
+                    EndDrag();
+                    return;
+                }
+
+                _wasExpandedBeforeDrag = true;   // the panel is in use, so it stays open
+
+                int index = Launchpad.Current.Slots.IndexOf(slot);
+                if (index >= 0) Launchpad.Current.Place(index, app);
+                return;
+            }
+
+            if (_currentTab == Tab.Clipboard && DroppedFiles(e) is { } files)
+            {
+                HighlightBoard(false);
+                _wasExpandedBeforeDrag = true;   // the panel is in use, so it stays open
+
+                // Where the pointer was let go, which is where the file appears - in the middle of
+                // it rather than hanging off the corner of it.
+                Point at = e.GetPosition(ClipboardList);
+                Pinboard.Current.Add(files, at.X, at.Y);
+                return;
+            }
+
+            // A picture out of a page, dropped on the board: the page has to hand it over before
+            // there is a file to put there.
+            if (_currentTab == Tab.Clipboard && WebImage.Carried(e.Data))
+            {
+                HighlightBoard(false);
+                _wasExpandedBeforeDrag = true;
+
+                TakePicturedFileAsync(e.Data, e.GetPosition(ClipboardList));
+                return;
+            }
+
+            if (DroppedImage(e) is not { } path)
+            {
+                // The same picture dropped anywhere else is the one the island offers to upload,
+                // which needs a file on disk for the same reason.
+                if (WebImage.Carried(e.Data))
+                {
+                    _wasExpandedBeforeDrag = true;
+                    SharePicturedFileAsync(e.Data);
+                    return;
+                }
+
+                EndDrag();
+                return;
+            }
+
+            _wasExpandedBeforeDrag = true;   // the upload's banner is about to own the island
+            ShareImageAsync(path);
+        }
+
+        // A picture dragged out of a page is not a file until it has been fetched and written down,
+        // which is the one drop on the island that cannot be answered at once. Nothing is said
+        // while it works: on the board the tile appearing where the picture was let go is the whole
+        // of the answer, and there is only something to say when the page does not give it up.
+        private async void TakePicturedFileAsync(IDataObject data, Point at)
+        {
+            string? path = await WebImage.SaveAsync(data);
+            if (path is null)
+            {
+                ShowBanner("Couldn't take the picture", "The page did not hand it over", _imageIcon);
+                return;
+            }
+
+            Pinboard.Current.Add([path], at.X, at.Y);
+        }
+
+        // The same picture dropped on any other tab, which is the island's offer to upload it: the
+        // uploader deals in files, so the picture is written down first and then offered as one.
+        private async void SharePicturedFileAsync(IDataObject data)
+        {
+            ShowBanner("Taking the picture", "From the page it was dragged out of", _imageIcon);
+
+            string? path = await WebImage.SaveAsync(data);
+            if (path is null)
+            {
+                ShowBanner("Couldn't take the picture", "The page did not hand it over", _imageIcon);
+                return;
+            }
+
+            ShareImageAsync(path);
+        }
+
+        // Only the first file is looked at. A drop of several is far more likely to be a folder's
+        // worth of things dragged by accident than a deliberate batch, and one link is what the
+        // caller is prepared to show.
+        private static string? DroppedImage(DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return null;
+            if (e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } files) return null;
+            return ImgBbUploader.LooksLikeImage(files[0]) ? files[0] : null;
+        }
+
+        // What a file drop is carrying, if it is the kind of thing the Launchpad can keep: a
+        // program, a shortcut to one, or one of the batch files people keep beside them. A folder or
+        // a document is not an app, and a drop effect of None is the only vocabulary a drag has for
+        // saying so - so a document dragged across the Launchpad gets the cursor it deserves.
+        private static string? DroppedApp(DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return null;
+            if (e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } files) return null;
+
+            string path = files[0];
+            string extension = Path.GetExtension(path).ToLowerInvariant();
+
+            bool openable = extension is ".exe" or ".lnk" or ".bat" or ".cmd" or ".com" or ".msc"
+                                     or ".url" or ".appref-ms";
+
+            return openable && File.Exists(path) ? path : null;
+        }
+
+        private async void ShareImageAsync(string path)
+        {
+            if (!Settings.Current.HasImgBbApiKey)
+            {
+                AskForKey();
+                return;
+            }
+
+            ShowBanner("Uploading image...", Path.GetFileName(path), _imageIcon);
+
+            var result = await ImgBbUploader.UploadAsync(Settings.Current.ImgBbApiKey, path);
+
+            if (!result.Ok)
+            {
+                ShowBanner("Couldn't share the image", result.Error, _imageIcon);
+                return;
+            }
+
+            // As with a shortened link, another process can have the clipboard open; the link is
+            // still worth reporting, so say what actually happened.
+            ShowBanner(
+                ClipboardSetText(result.Link) ? "Link copied" : "Image uploaded",
+                result.Link,
+                _imageIcon);
+        }
+
+        // The one way in for a feature whose key hasn't been set. The prompt's second button is the
+        // fix itself, so nobody has to be told which window to open - and it opens on the page that
+        // explains how to get a key, rather than on whatever was looked at last.
+        private void AskForKey() => AskToConfirm(
+            "Add an ImgBB API key",
+            "Open Settings",
+            () => (Application.Current as App)?.ShowSettings(SettingsWindow.ApiKeysPage));
+
+        // ---- The Clipboard board ----
+
+        // The file being dragged, if one is, and where it was picked up: how far the pointer was
+        // from the file's top left corner, which is what keeps the file from jumping under the
+        // pointer the moment it is taken hold of. Where it started from is remembered separately,
+        // because a click is a drag that went nowhere, and one of those is not worth writing down.
+        private PinnedFile? _draggingFile;
+        private Point _dragGrab;
+        private Point _dragFrom;
+
+        // Raised by the board rather than by the file, because the capture is the board's: once the
+        // mouse belongs to it, every move and every release arrives there and nowhere else.
+        private int _dragZ;
+
+        // Taking hold of a file. A file is not a button: nothing happens on the way down, and the
+        // two clicks that open it are the mouse's other gesture, so this is where the two part
+        // company - a second click opens the file, the first is the start of a drag.
+        private void ClipboardFile_Down(object sender, MouseButtonEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not PinnedFile file) return;
+
+            e.Handled = true;   // don't let the click reach Island_Click and shut the panel
+
+            if (e.ClickCount == 2)
+            {
+                ReleaseFileDrag();
+                OpenFile(file.Path, file.Name, file.Preview);
+                return;
+            }
+
+            _draggingFile = file;
+            _dragFrom = new Point(file.X, file.Y);
+
+            Point grab = e.GetPosition(ClipboardList);
+            _dragGrab = new Point(grab.X - file.X, grab.Y - file.Y);
+
+            file.IsDragging = true;
+
+            // Held above everything else on the board for as long as it is being moved, so that a
+            // file can always be dragged out from under another one - and only for that long, since
+            // the list on disk stays the order the files were put there.
+            if (sender is DependencyObject element
+                && ItemsControl.ContainerFromElement(ClipboardList, element) is UIElement container)
+                Panel.SetZIndex(container, ++_dragZ);
+
+            Mouse.Capture(ClipboardList);
+        }
+
+        private void ClipboardList_Move(object sender, MouseEventArgs e)
+        {
+            if (_draggingFile is null) return;
+
+            // Let go of outside the window, or the capture taken by something else, and the file
+            // is put down where it is rather than left being carried forever.
+            if (e.LeftButton != MouseButtonState.Pressed)
+            {
+                ReleaseFileDrag();
+                return;
+            }
+
+            // Carried off the island, the file has left the only place it lives: from here it is a
+            // Windows drag - the same one Explorer starts - and it can end anywhere a file can.
+            if (!OnIsland(e))
+            {
+                DragFileOut(_draggingFile);
+                return;
+            }
+
+            Point at = e.GetPosition(ClipboardList);
+            Pinboard.Current.Move(_draggingFile, at.X - _dragGrab.X, at.Y - _dragGrab.Y);
+        }
+
+        // Whether the pointer is still on the island at all. The island is the whole of where a
+        // file here can be, so this is the line between moving one about and taking it away.
+        private bool OnIsland(MouseEventArgs e)
+        {
+            Point here = e.GetPosition(this);
+            Point corner = Island.TranslatePoint(new Point(0, 0), this);
+            return new Rect(corner, Island.RenderSize).Contains(here);
+        }
+
+        // Hands the file over to Windows, which is the only way a file can be dragged to somewhere
+        // that is not here. The call does not return until the drag ends.
+        //
+        // What is handed over is a copy, never the file itself: the board keeps the file and keeps
+        // its place on it, and what the place it was dropped on does with the copy is that place's
+        // business. A drag that was abandoned ends in exactly the same state, so either way the file
+        // goes back to where it was picked up from - which is where it would have stayed had nobody
+        // touched it. Nothing was written to disk on the way, so nothing has to be written back.
+        private void DragFileOut(PinnedFile file)
+        {
+            var data = new DataObject(DataFormats.FileDrop, new[] { file.Path });
+
+            // The board is done with it - the capture goes back before Windows takes its own, and
+            // the file stops saying it is being carried. The field is cleared first, because giving
+            // the capture back is what raises the handler that would otherwise tidy up after this.
+            _draggingFile = null;
+            Mouse.Capture(null);
+            file.IsDragging = false;
+
+            DragDrop.DoDragDrop(ClipboardList, data, DragDropEffects.Copy);
+
+            file.X = _dragFrom.X;
+            file.Y = _dragFrom.Y;
+        }
+
+        private void ClipboardList_Up(object sender, MouseButtonEventArgs e)
+        {
+            if (_draggingFile is null) return;
+
+            e.Handled = true;   // a drag that went nowhere is not a click on the island either
+            ReleaseFileDrag();
+        }
+
+        private void ClipboardList_LostCapture(object sender, MouseEventArgs e) => ReleaseFileDrag();
+
+        // Puts the file down: the capture goes back, the file stops saying it is being carried, and
+        // the file is written - but only if it ended up somewhere other than where it started.
+        private void ReleaseFileDrag()
+        {
+            var file = _draggingFile;
+            if (file is null) return;
+
+            // Let go of the field before the capture, because giving the capture back is itself
+            // what raises the handler that calls this.
+            _draggingFile = null;
+
+            Mouse.Capture(null);
+            file.IsDragging = false;
+
+            if (file.X != _dragFrom.X || file.Y != _dragFrom.Y) Pinboard.Current.Save();
+        }
+
+        // Taking a file off the board. The badge owns the click, so it never reaches the file
+        // underneath it and never starts a drag.
+        //
+        // A picture taken off a page is the app's own copy, and there is no other copy of it on the
+        // disk, so it goes with the pin - unless the same file is pinned more than once, in which
+        // case the other pin still needs it. Everything else on the board is a file of the person's
+        // own, and taking it off the board leaves it where it was.
+        private void ClipboardRemove_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+
+            if ((sender as FrameworkElement)?.DataContext is not PinnedFile file) return;
+
+            Pinboard.Current.Remove(file);
+            ForgetHoverName();   // the thing it was naming is no longer there
+
+            bool stillPinned = Pinboard.Current.Files
+                .Any(pinned => string.Equals(pinned.Path, file.Path, StringComparison.OrdinalIgnoreCase));
+
+            if (!stillPinned) WebImage.Discard(file.Path);
+        }
+
+        // The board's size, from the board's own layout - which is the only thing that knows how big
+        // it actually is. It is also where a place written by hand that the panel has no room for
+        // any more is brought back inside it.
+        private void ClipboardList_SizeChanged(object sender, SizeChangedEventArgs e) =>
+            Pinboard.Current.Resize(ClipboardList.ActualWidth, ClipboardList.ActualHeight);
+
+        private static readonly Brush BoardHotOutline =
+            new SolidColorBrush(Color.FromArgb(0x59, 0xFF, 0xFF, 0xFF));
+
+        // The whole board lights up while a file is over it, because the whole board is where that
+        // file will land: a file dropped here is not dropped on anything in particular.
+        private void HighlightBoard(bool on) =>
+            ClipboardBoard.BorderBrush = on ? BoardHotOutline : Brushes.Transparent;
+
+        // What a file drop is carrying, if it is carrying files at all. The Launchpad is choosy
+        // about what it takes, because a tile has to be able to open what is on it; the board is
+        // not, because a file is opened by whatever Windows opens it with.
+        private static string[]? DroppedFiles(DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return null;
+            if (e.Data.GetData(DataFormats.FileDrop) is not string[] files) return null;
+
+            string[] present = [.. files.Where(File.Exists)];
+            return present.Length > 0 ? present : null;
+        }
+
+        // Opens a file with whatever Windows opens it with - an app from the Launchpad, a document
+        // from the board - and, when it will not open, says so rather than quietly doing nothing.
+        // The tile it was opened from stays either way: a file that has been moved since it was put
+        // here, or one Windows no longer knows how to open, is still the file that was put here.
+        private void OpenFile(string path, string name, ImageSource? icon)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            }
+            catch (Exception e) when (e is Win32Exception or InvalidOperationException or IOException
+                                        or UnauthorizedAccessException or NotSupportedException)
+            {
+                ShowBanner($"Couldn't open {name}", path, icon);
+            }
+        }
+
+        // ---- The Launchpad ----
+
+        // The tile a dragged file is over, if it is over one at all.
+        //
+        // A drop arrives at the island as a whole - see the note on the drag handler - so
+        // hit-testing it is what ties a drop to the tile it was aimed at. The walk up the tree stops
+        // at the tab: everything below that belongs to a tile and everything above it belongs to the
+        // island, so a hit on the tab itself - the gaps between tiles, the margins around them - is
+        // a miss.
+        private LaunchpadSlot? SlotAt(DragEventArgs e)
+        {
+            if (LaunchpadContent.Visibility != Visibility.Visible) return null;
+
+            var element = HoverZone.InputHitTest(e.GetPosition(HoverZone)) as DependencyObject;
+            while (element is not null && !ReferenceEquals(element, LaunchpadContent))
+            {
+                if (element is FrameworkElement { DataContext: LaunchpadSlot slot }) return slot;
+                element = ParentOf(element);
+            }
+
+            return null;
+        }
+
+        // Exactly one tile wears this at a time: the tile under the file being dragged, which is the
+        // only thing on the island that says where the drop will land.
+        private LaunchpadSlot? _dropSlot;
+
+        private void HighlightSlot(LaunchpadSlot? slot)
+        {
+            if (ReferenceEquals(_dropSlot, slot)) return;
+
+            if (_dropSlot is not null) _dropSlot.IsDropTarget = false;
+            _dropSlot = slot;
+            if (_dropSlot is not null) _dropSlot.IsDropTarget = true;
+        }
+
+        // Opens what a tile holds. An empty tile has nothing to open, so a click on one is taken
+        // as the other way of filling it - the same question a drop answers, asked in the way a
+        // file is normally chosen rather than dragged.
+        private void LaunchpadTile_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;   // don't let the click bubble to Island_Click and shut the panel
+
+            if ((sender as FrameworkElement)?.DataContext is not LaunchpadSlot slot) return;
+
+            if (slot.IsEmpty)
+            {
+                PickAppFor(slot);
+                return;
+            }
+
+            OpenFile(slot.Path, slot.Name, slot.Icon);
+        }
+
+        // Filling an empty tile by hand: the same question a drop answers, asked with the picker
+        // rather than with the mouse. Only the file matters - which tile it goes in needs no
+        // asking, it is the one that was clicked - and it goes in the way a drop would, shortcut
+        // and all.
+        private void PickAppFor(LaunchpadSlot slot)
+        {
+            var picker = new OpenFileDialog
+            {
+                Title = "Choose an app for this tile",
+                Filter = "Apps (*.exe;*.lnk;*.bat;*.cmd;*.msc;*.url;*.appref-ms)"
+                       + "|*.exe;*.lnk;*.bat;*.cmd;*.msc;*.url;*.appref-ms"
+                       + "|All files (*.*)|*.*",
+                CheckFileExists = true,
+                Multiselect = false,
+            };
+
+            // The island is deliberately unable to hold the foreground - that is what keeps it out
+            // of Alt+Tab and off the taskbar - and a dialog shown by a process that is not in
+            // front of anything tends to open behind what is. The keyboard is borrowed for as long
+            // as the picker is up, and handed back to whoever had it when it closes.
+            //
+            // The island also gives up the topmost band for that time. It sits above everything by
+            // design, which would otherwise leave the picker's own title bar underneath the widget
+            // - a dialog with the island lying across the top of it. A window below the one that
+            // asked for it, on the other hand, is exactly where a picker belongs, and the band is
+            // claimed back the moment the dialog closes.
+            _pickerOpen = true;
+            Topmost = false;
+
+            TakeKeyboard();
+            bool? chosen;
+            try
+            {
+                chosen = picker.ShowDialog(this);
+            }
+            finally
+            {
+                ReleaseKeyboard();
+
+                _pickerOpen = false;
+                Topmost = true;
+                ForceTopmost();
+            }
+
+            if (chosen != true) return;
+
+            int index = Launchpad.Current.Slots.IndexOf(slot);
+            if (index >= 0) Launchpad.Current.Place(index, picker.FileName);
+        }
+
+        // The Launchpad explains itself the first time the tab is ever opened, and only then. The
+        // flag is written as the page appears rather than as it is put away, so that it really is
+        // once: a tour that returned because the island was closed over it would be a tour that
+        // never ends. After this, opening the tab opens the apps.
+        private void ShowLaunchpadIntroIfNew()
+        {
+            if (Settings.Current.LaunchpadIntroSeen) return;
+
+            Settings.Current.Set(() => Settings.Current.LaunchpadIntroSeen = true);
+
+            // Both of these are only ever done by something that put the page away, and both have
+            // to be undone here rather than left to the next reading of the flag.
+            LaunchpadIntro.BeginAnimation(OpacityProperty, null);
+            LaunchpadIntro.IsHitTestVisible = true;
+            LaunchpadIntro.Visibility = Visibility.Visible;
+        }
+
+        // Reading it is agreeing with it: a click anywhere on the page - the plate or the button -
+        // puts it away and leaves the grid underneath in reach. That click is also the first one
+        // somebody aiming at a tile will make, and it should not close the island instead.
+        private void LaunchpadIntro_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            HideLaunchpadIntro(fade: true);
+        }
+
+        // The page is faded away rather than switched off. It is a black plate lying over a grid
+        // of black tiles, so what the fade actually draws is the page's writing going and the
+        // tiles coming, one over the other - where cutting it would show both change between two
+        // frames. It is also out of the way of the mouse the moment the fade starts: this is the
+        // first click a new user makes, and the click after it is meant for a tile.
+        //
+        // A drag is the one case that skips the fade. The file is already coming down and there
+        // has to be a tile under it to land on.
+        private void HideLaunchpadIntro(bool fade)
+        {
+            if (LaunchpadIntro.Visibility != Visibility.Visible) return;
+
+            LaunchpadIntro.IsHitTestVisible = false;
+
+            if (!fade)
+            {
+                LaunchpadIntro.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            var fadeOut = new DoubleAnimation(0, ConfirmFade)
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+            fadeOut.Completed += (_, _) => LaunchpadIntro.Visibility = Visibility.Collapsed;
+
+            LaunchpadIntro.BeginAnimation(OpacityProperty, fadeOut);
+        }
+
+        // Empties a tile, leaving it for something else to be dropped on. The badge that does this
+        // lives inside the tile's own button, so the click is dealt with here before the tile gets
+        // to see it - which is what stops it opening the very app it is about to take away.
+        private void LaunchpadRemove_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+
+            if ((sender as FrameworkElement)?.DataContext is not LaunchpadSlot slot || slot.IsEmpty) return;
+
+            int index = Launchpad.Current.Slots.IndexOf(slot);
+            if (index >= 0) Launchpad.Current.Clear(index);
+
+            ForgetHoverName();   // the thing it was naming is no longer there
+        }
+
         // ---- Taking the keyboard ----
 
         // The island is a non-activating window on purpose (WS_EX_NOACTIVATE), and that is also
@@ -1000,6 +2091,7 @@ namespace TopNotch
         // island keeps out of Alt+Tab even while it is holding the keyboard.
         private IntPtr _focusReturn;
         private bool _urlInputOpen;
+        private bool _quitting;
 
         private void TakeKeyboard()
         {
@@ -1026,12 +2118,17 @@ namespace TopNotch
             }
         }
 
+        // Called by the tray's Quit before it shuts the app down. The only close this window ever
+        // holds back is the link box's, and that has to give way to a deliberate exit - otherwise
+        // quitting with the box open would leave nothing on screen and no way to ask again.
+        internal void AllowShutdown() => _quitting = true;
+
         // Holding the keyboard is the only thing that can bring the island an Alt+F4, and losing
         // the whole widget to a key aimed at the app behind it would be a poor trade: closing the
         // box is the sensible reading of it.
         protected override void OnClosing(CancelEventArgs e)
         {
-            if (_urlInputOpen)
+            if (_urlInputOpen && !_quitting)
             {
                 e.Cancel = true;
                 HideUrlInput();
@@ -1186,6 +2283,21 @@ namespace TopNotch
             public int cy;
             public uint flags;
         }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        private const int VK_LBUTTON = 0x01;
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out POINT point);
+
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);

@@ -12,16 +12,17 @@
         ShowInTaskbar="False"
         ShowActivated="False"
         ResizeMode="NoResize"
-        Width="500" Height="160"
+        Width="500" Height="180"
         Loaded="Window_Loaded"
-        RenderOptions.BitmapScalingMode="HighQuality">
+        RenderOptions.BitmapScalingMode="HighQuality"
+        FontFamily="{StaticResource AppFont}">
 
     <Window.Resources>
         <Style TargetType="Image">
             <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
         </Style>
 
-        <FontFamily x:Key="sf_regular">/Fonts/#SF Pro Display</FontFamily>
+        <!-- AppFont is defined once, in App.xaml, because the settings window uses it too. -->
 
         <Style x:Key="IconButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
@@ -88,7 +89,7 @@
              of tiles out of the tab. -->
         <Style x:Key="QuickActionLabel" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#FFB4B4B4" />
-            <Setter Property="FontFamily" Value="{StaticResource sf_regular}" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="LineHeight" Value="15" />
             <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
@@ -96,7 +97,204 @@
             <Setter Property="TextAlignment" Value="Center" />
         </Style>
 
-        <!-- Tab labels. Same weight for all three: the strip is centred, so letting the active
+        <!-- Launchpad tiles. The button covers a whole cell of the grid rather than the 44px tile
+             inside it, so a file dragged to the gap between two tiles still lands on the tile it
+             was aimed at, while the tile itself stays a tidily separated square. An empty tile is
+             an outline with a plus on it and a filled one is the app's own icon, and both are the
+             same shape, so filling a tile changes nothing about the layout around it. -->
+        <Style x:Key="LaunchpadTile" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Background="Transparent">
+                            <Grid Width="44" Height="44"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Border x:Name="Plate" CornerRadius="12"
+                                        Background="Transparent" BorderBrush="#73FFFFFF" BorderThickness="1" />
+
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                                <!-- Giving an app up again, on hover only. It is deliberately small
+                                     and over the icon's corner: a tile that can only ever be
+                                     replaced is a tile that can never be emptied. -->
+                                <Button x:Name="Remove" Style="{StaticResource IconButton}"
+                                        Width="15" Height="15"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Margin="0,-4,-4,0" Opacity="0" Visibility="Collapsed"
+                                        ToolTip="Remove" ToolTipService.IsEnabled="False"
+                                        Click="LaunchpadRemove_Click">
+                                    <Border Background="#E6000000" CornerRadius="7.5"
+                                            BorderBrush="#66FFFFFF" BorderThickness="1">
+                                        <TextBlock Text="&#xE711;"
+                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                   FontSize="8" Foreground="White"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </Button>
+                            </Grid>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="#1AFFFFFF" />
+                                <Setter TargetName="Remove" Property="Opacity" Value="1" />
+                            </Trigger>
+
+                            <!-- An app is its own edge; the outline belongs to the empty tiles. -->
+                            <DataTrigger Binding="{Binding IsEmpty}" Value="False">
+                                <Setter TargetName="Plate" Property="BorderBrush" Value="Transparent" />
+                                <Setter TargetName="Remove" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+
+                            <!-- The tile a dragged file is currently over, said out loud. -->
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="#33FFFFFF" />
+                                <Setter TargetName="Plate" Property="BorderBrush" Value="White" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <!-- Only a tile with an app on it has a name to show. Left unset everywhere else,
+                     because an empty tooltip is a box that says nothing.
+
+                     The tool tip service is switched off wherever a tool tip is used like this: the
+                     island draws tile names itself (see Island_MouseMove), because WPF's own tool
+                     tips are drawn on the window's behalf and this window is never activated, and
+                     left on, both plates would be on screen at once. -->
+                <DataTrigger Binding="{Binding IsEmpty}" Value="False">
+                    <Setter Property="ToolTip" Value="{Binding Name}" />
+                    <Setter Property="ToolTipService.IsEnabled" Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- What a tile holds: a plus, the app's icon, or the app's initial when its file had no
+             icon to give. The plus is drawn rather than typed, so that it sits on the tile's
+             middle without a font's idea of where a plus belongs. -->
+        <DataTemplate x:Key="LaunchpadTileTemplate">
+            <Button Style="{StaticResource LaunchpadTile}" Click="LaunchpadTile_Click">
+                <Grid>
+                    <Grid x:Name="Plus" Width="16" Height="16">
+                        <Rectangle Width="16" Height="1.5" RadiusX="0.75" RadiusY="0.75" Fill="#8CFFFFFF"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Rectangle Width="1.5" Height="16" RadiusX="0.75" RadiusY="0.75" Fill="#8CFFFFFF"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Image x:Name="Icon" Source="{Binding Icon}" Width="44" Height="44"
+                           Visibility="Collapsed">
+                        <Image.Clip>
+                            <RectangleGeometry Rect="0,0,44,44" RadiusX="12" RadiusY="12" />
+                        </Image.Clip>
+                    </Image>
+
+                    <TextBlock x:Name="Initial" Text="{Binding Initial}" Visibility="Collapsed"
+                               Foreground="#B3FFFFFF" FontSize="17" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsEmpty}" Value="False">
+                    <Setter TargetName="Plus" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasIcon}" Value="False">
+                    <Setter TargetName="Icon" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="Initial" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- A file on the Clipboard board. It is a Border rather than a Button because a file is
+             not pressed: it is picked up and put down again, and the two clicks that open it are the
+             mouse's other gesture. A file's own picture does not fill the square it is given - a
+             film's thumbnail is a wide strip, a photo can be a tall one - so the rounded plate
+             behind it is what says where the file is and lights up under the pointer. -->
+        <DataTemplate x:Key="ClipboardFileTemplate">
+            <Border x:Name="Plate"
+                    Width="44" Height="44" CornerRadius="12"
+                    Background="Transparent" Cursor="Hand"
+                    ToolTip="{Binding Name}" ToolTipService.IsEnabled="False"
+                    MouseLeftButtonDown="ClipboardFile_Down">
+                <Grid>
+                    <Image x:Name="Preview" Source="{Binding Preview}"
+                           Width="44" Height="44" Stretch="Uniform" Visibility="Collapsed" />
+
+                    <TextBlock x:Name="Initial" Text="{Binding Initial}" Visibility="Collapsed"
+                               Foreground="#B3FFFFFF" FontSize="17" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                    <!-- Giving a file up again, on hover only: the same badge the Launchpad uses,
+                         for the same reason - the board is for the files on it, not for the ones
+                         that were. -->
+                    <Button x:Name="Remove" Style="{StaticResource IconButton}"
+                            Width="15" Height="15"
+                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Margin="0,-4,-4,0" Opacity="0"
+                            ToolTip="Remove" ToolTipService.IsEnabled="False"
+                            Click="ClipboardRemove_Click">
+                        <Border Background="#E6000000" CornerRadius="7.5"
+                                BorderBrush="#66FFFFFF" BorderThickness="1">
+                            <TextBlock Text="&#xE711;"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       FontSize="8" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <DataTemplate.Triggers>
+                <Trigger SourceName="Plate" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Plate" Property="Background" Value="#1AFFFFFF" />
+                    <Setter TargetName="Remove" Property="Opacity" Value="1" />
+                </Trigger>
+
+                <!-- The file being dragged, held above the others while it is on its way. -->
+                <DataTrigger Binding="{Binding IsDragging}" Value="True">
+                    <Setter TargetName="Plate" Property="Background" Value="#33FFFFFF" />
+                    <Setter TargetName="Remove" Property="Opacity" Value="0" />
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding HasPreview}" Value="True">
+                    <Setter TargetName="Preview" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasPreview}" Value="False">
+                    <Setter TargetName="Initial" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Tile tooltips. The ones the system would draw are light; this is the same dark plate
+             the rest of the island speaks in, so that naming an app does not flash a piece of
+             Windows over it. -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#F21C1C1E" />
+            <Setter Property="Foreground" Value="#FFEDEDED" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}"
+                                BorderBrush="#33FFFFFF" BorderThickness="1">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Tab labels. Same weight for all of them: the strip is centred, so letting the active
              label get heavier would re-measure it and jog the whole strip sideways on every
              switch. Colour and the underline carry the state instead. Padding is horizontal-only
              so the underline beneath matches the label rather than the click target. -->
@@ -106,7 +304,7 @@
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Foreground" Value="#FF9A9A9A" />
-            <Setter Property="FontFamily" Value="{StaticResource sf_regular}" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Padding" Value="0,1" />
@@ -129,7 +327,7 @@
         <Style x:Key="ConfirmCancelButton" TargetType="Button">
             <Setter Property="Background" Value="#1AFFFFFF" />
             <Setter Property="Foreground" Value="White" />
-            <Setter Property="FontFamily" Value="{StaticResource sf_regular}" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Padding" Value="13,4" />
@@ -239,19 +437,30 @@
         </Style>
     </Window.Resources>
 
+    <!-- The island is drawn with its top three pixels above the top of the screen, which is what
+         makes the notch borderless: there is no edge where it meets the screen, because there is no
+         edge there. The window is taller than the island because the floating style has to drop in
+         from above the screen; everything below the island is transparent, and a transparent pixel
+         is one the mouse goes straight through to whatever is behind. -->
     <Grid x:Name="HoverZone"
       Background="Transparent"
       Width="460" Height="142"
       HorizontalAlignment="Center" VerticalAlignment="Top"
       MouseEnter="Zone_MouseEnter"
-      MouseLeave="Zone_MouseLeave" Margin="0,-3,0,0">
+      MouseLeave="Zone_MouseLeave" Margin="0,-3,0,0"
+      AllowDrop="True"
+      DragOver="Island_DragOver"
+      DragLeave="Island_DragLeave"
+      Drop="Island_Drop">
 
         <Border x:Name="Island"
         Background="Black"
         CornerRadius="0,0,20,20"
         Width="460" Height="142"
         VerticalAlignment="Top"
-        MouseLeftButtonDown="Island_Click">
+        MouseLeftButtonDown="Island_Click"
+        MouseMove="Island_MouseMove"
+        MouseLeave="Island_MouseLeave">
             <Border.RenderTransform>
                 <TranslateTransform x:Name="IslandShift" Y="-0" />
             </Border.RenderTransform>
@@ -284,6 +493,16 @@
                             <StackPanel Margin="9,0">
                                 <Button x:Name="HistoryTab" Content="History" Style="{StaticResource TabButton}" Click="Tab_Click" />
                                 <Border x:Name="HistoryUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" Opacity="0" />
+                            </StackPanel>
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="LaunchpadTab" Content="Launchpad" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="LaunchpadUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" Opacity="0" />
+                            </StackPanel>
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="ClipboardTab" Content="Clipboard" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="ClipboardUnderline" Height="3" CornerRadius="1.5"
                                         Background="White" Margin="0,3,0,0" Opacity="0" />
                             </StackPanel>
                         </StackPanel>
@@ -391,12 +610,17 @@
                                             <Image Source="/Sprites/link.png" Width="22" Height="22" />
                                         </Button>
 
-                                        <!-- Placeholder: the cell is wired up, captioned and sized like the
-                                             rest, but the button has no behaviour until its feature lands. -->
-                                        <Button Grid.Row="3" Grid.Column="2" Style="{StaticResource QuickActionButton}"
+                                        <!-- Share Image: the island's one drop target. The button
+                                             itself opens the explanation of how to use it; the drop
+                                             is taken by the island as a whole, so a picture only has
+                                             to be brought near the notch rather than landed on a
+                                             36x30 tile. -->
+                                        <Button x:Name="ShareImageButton"
+                                                Grid.Row="3" Grid.Column="2" Style="{StaticResource QuickActionButton}"
                                                 Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
                                                 Tag="Share Image"
-                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave">
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="ShareImage_Click">
                                             <Image Source="/Sprites/picture.png" Width="33" Height="33" />
                                         </Button>
 
@@ -436,11 +660,11 @@
                                              No whitespace between the runs on purpose: the space that
                                              separates them is the designator's own leading space, and
                                              letting XAML insert another would double it. -->
-                                        <TextBlock Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                        <TextBlock Foreground="White" FontFamily="{StaticResource AppFont}"
                                                    FontSize="40" FontWeight="SemiBold"
                                                    HorizontalAlignment="Left"><Run x:Name="ClockTimeRun" Text="--:--" /><Run x:Name="ClockMeridiemRun" Text=" --" FontSize="20" /></TextBlock>
                                         <TextBlock x:Name="DateText" Text=""
-                                                   Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                                   Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
                                                    FontSize="13"
                                                    Margin="3,3,0,0" HorizontalAlignment="Left" />
                                     </StackPanel>
@@ -472,11 +696,11 @@
                                             </Grid.RowDefinitions>
 
                                             <TextBlock Grid.Row="0" Text="CPU"
-                                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                       Foreground="White" FontFamily="{StaticResource AppFont}"
                                                        FontSize="11" FontWeight="SemiBold"
                                                        HorizontalAlignment="Left" />
                                             <TextBlock x:Name="CpuPercentText" Grid.Row="0" Text="--%"
-                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
                                                        FontSize="10"
                                                        HorizontalAlignment="Right" />
 
@@ -495,11 +719,11 @@
                                             </Grid.RowDefinitions>
 
                                             <TextBlock Grid.Row="0" Text="Memory"
-                                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                       Foreground="White" FontFamily="{StaticResource AppFont}"
                                                        FontSize="11" FontWeight="SemiBold"
                                                        HorizontalAlignment="Left" />
                                             <TextBlock x:Name="MemoryPercentText" Grid.Row="0" Text="--%"
-                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
                                                        FontSize="10"
                                                        HorizontalAlignment="Right" />
 
@@ -559,11 +783,11 @@
                                                 </Grid.RowDefinitions>
 
                                                 <TextBlock x:Name="TrackTitle" Text="Track"
-                                           Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                           Foreground="White" FontFamily="{StaticResource AppFont}"
                                            VerticalAlignment="Center" Height="24"
                                            TextTrimming="CharacterEllipsis" TextAlignment="Left" HorizontalAlignment="Left" Width="175" />
                                                 <TextBlock x:Name="ArtistName" Text="Artist" Grid.Row="1"
-                                           Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                           Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
                                            VerticalAlignment="Center" Height="24"
                                            TextTrimming="CharacterEllipsis" TextAlignment="Left" HorizontalAlignment="Left" />
                                             </Grid>
@@ -620,7 +844,7 @@
                                                RenderOptions.BitmapScalingMode="HighQuality" />
                                         <TextBlock x:Name="DeviceNameText" Grid.Row="1"
                                                    Text="Connected Device"
-                                                   Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                   Foreground="White" FontFamily="{StaticResource AppFont}"
                                                    FontSize="14" FontWeight="SemiBold"
                                                    TextAlignment="Center" VerticalAlignment="Center"
                                                    TextWrapping="Wrap"
@@ -671,19 +895,19 @@
                                                             </Grid.RowDefinitions>
 
                                                             <TextBlock Grid.Row="0" Text="{Binding Title}"
-                                                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                                                       Foreground="White" FontFamily="{StaticResource AppFont}"
                                                                        FontSize="12" FontWeight="SemiBold"
                                                                        VerticalAlignment="Center"
                                                                        TextTrimming="CharacterEllipsis" />
                                                             <TextBlock Grid.Row="1" Text="{Binding Body}"
-                                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
                                                                        FontSize="11"
                                                                        VerticalAlignment="Center"
                                                                        TextTrimming="CharacterEllipsis" />
                                                         </Grid>
 
                                                         <TextBlock Grid.Column="2" Text="{Binding TimeText}"
-                                                                   Foreground="#FF7A7A7A" FontFamily="{StaticResource sf_regular}"
+                                                                   Foreground="#FF7A7A7A" FontFamily="{StaticResource AppFont}"
                                                                    FontSize="10"
                                                                    VerticalAlignment="Center" Margin="8,0,0,0" />
                                                     </Grid>
@@ -693,9 +917,153 @@
                                     </local:SnapScrollViewer>
 
                                     <TextBlock x:Name="HistoryEmpty" Text="No notifications yet"
-                                               Foreground="#FF8A8A8A" FontFamily="{StaticResource sf_regular}"
+                                               Foreground="#FF8A8A8A" FontFamily="{StaticResource AppFont}"
                                                FontSize="12"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <!-- Launchpad tab: the apps that have been dropped here, in a grid
+                                     that fills the panel. Rows only, because a UniformGrid works its
+                                     columns out from the number of tiles it is handed - so the size
+                                     of the panel is written down once, in Launchpad.SlotCount, and
+                                     the tiles arrange themselves around it. -->
+                                <Grid x:Name="LaunchpadContent" Visibility="Collapsed">
+                                    <ItemsControl x:Name="LaunchpadList"
+                                                  ItemTemplate="{StaticResource LaunchpadTileTemplate}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Rows="2" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+
+                                    <!-- The Launchpad's one page of writing, shown over the grid
+                                         the first time the tab is ever opened and never again.
+                                         Opaque black rather than a translucent veil: the empty
+                                         tiles behind it say nothing, and sixteen outlines showing
+                                         through a paragraph would be a great deal of noise around
+                                         very little text. Clicking anywhere on it - the plate or
+                                         the button - puts it away, which is the whole of what it
+                                         asks of anybody who has read it. -->
+                                    <Grid x:Name="LaunchpadIntro" Background="Black"
+                                          Visibility="Collapsed"
+                                          MouseLeftButtonDown="LaunchpadIntro_Click">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center"
+                                                    Margin="2,0,0,0">
+                                            <TextBlock Text="Your Launchpad"
+                                                       Foreground="White"
+                                                       FontFamily="{StaticResource AppFont}"
+                                                       FontSize="13" FontWeight="SemiBold" />
+
+                                            <TextBlock Margin="0,5,0,0"
+                                                       Foreground="#FFB4B4B4"
+                                                       FontFamily="{StaticResource AppFont}"
+                                                       FontSize="11" LineHeight="15"
+                                                       LineStackingStrategy="BlockLineHeight"
+                                                       TextWrapping="Wrap"
+                                                       Text="Drag an app onto a square to keep it here." />
+
+                                            <TextBlock Margin="0,2,0,0"
+                                                       Foreground="#FFB4B4B4"
+                                                       FontFamily="{StaticResource AppFont}"
+                                                       FontSize="11" LineHeight="15"
+                                                       LineStackingStrategy="BlockLineHeight"
+                                                       TextWrapping="Wrap"
+                                                       Text="Click a square to pick an app from your PC." />
+
+                                            <TextBlock Margin="0,2,0,0"
+                                                       Foreground="#FFB4B4B4"
+                                                       FontFamily="{StaticResource AppFont}"
+                                                       FontSize="11" LineHeight="15"
+                                                       LineStackingStrategy="BlockLineHeight"
+                                                       TextWrapping="Wrap"
+                                                       Text="Click a tile to open it. Hover it and click × to remove." />
+                                        </StackPanel>
+
+                                        <Button Grid.Column="1" Content="OK"
+                                                Style="{StaticResource ConfirmAcceptButton}"
+                                                VerticalAlignment="Center" Margin="14,0,0,0"
+                                                Click="LaunchpadIntro_Click" />
+                                    </Grid>
+                                </Grid>
+
+                                <!-- Clipboard tab: files dropped anywhere on the panel, and dragged
+                                     about from there. There is no grid here on purpose - the board
+                                     is the whole panel and the place a file is left is the place it
+                                     stays - so the panel is a Canvas and each file carries the
+                                     corner it sits at. What a file opens with is the shell's
+                                     business, so any file at all is taken here, where the Launchpad
+                                     takes only the ones it could open. -->
+                                <Grid x:Name="ClipboardContent" Visibility="Collapsed">
+                                    <!-- Lights up while a file is over the board: the whole panel is
+                                         where it will land, so the whole panel is what says so. Out
+                                         of the mouse's way, so the drop - which the island takes,
+                                         not the panel - and the files themselves pass through it
+                                         as though it were not there. -->
+                                    <Border x:Name="ClipboardBoard" CornerRadius="12"
+                                            BorderThickness="1" BorderBrush="Transparent"
+                                            IsHitTestVisible="False" />
+
+                                    <!-- Inset a little, so that a file at the very edge of the board
+                                         sits inside the frame rather than on it. -->
+                                    <ItemsControl x:Name="ClipboardList"
+                                                  ItemTemplate="{StaticResource ClipboardFileTemplate}"
+                                                  Margin="3"
+                                                  SizeChanged="ClipboardList_SizeChanged"
+                                                  MouseMove="ClipboardList_Move"
+                                                  MouseLeftButtonUp="ClipboardList_Up"
+                                                  LostMouseCapture="ClipboardList_LostCapture">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+
+                                        <!-- A file's place on the board is the file's own, so the
+                                             container is put where the file says it is and the
+                                             Canvas does the rest. -->
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                                <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
+                                    </ItemsControl>
+
+                                    <!-- What the board says while there is nothing on it: what it is
+                                         for, and the two things a file does that dragging is not.
+                                         Behind the files and out of the mouse's way, so that the
+                                         first file can be dropped straight onto it. -->
+                                    <StackPanel x:Name="ClipboardHint" IsHitTestVisible="False"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasItems, ElementName=ClipboardList}"
+                                                                 Value="False">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+
+                                        <TextBlock Text="Drag files here"
+                                                   Foreground="#FFB4B4B4"
+                                                   FontFamily="{StaticResource AppFont}"
+                                                   FontSize="13" HorizontalAlignment="Center" />
+
+                                        <TextBlock Margin="0,3,0,0"
+                                                   Text="Double-click one to open it · Drag anywhere · Hover it and click × to remove"
+                                                   Foreground="#8CFFFFFF"
+                                                   FontFamily="{StaticResource AppFont}"
+                                                   FontSize="11" HorizontalAlignment="Center" />
+                                    </StackPanel>
                                 </Grid>
                             </Grid>
                         </Grid>
@@ -713,7 +1081,7 @@
                              of the button row and centres itself over it. -->
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock x:Name="ConfirmPrompt" Text="Shut down?"
-                                       Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                       Foreground="White" FontFamily="{StaticResource AppFont}"
                                        FontSize="15" FontWeight="SemiBold"
                                        TextAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
@@ -743,11 +1111,11 @@
                                              Background="Transparent" BorderThickness="0"
                                              Foreground="White" CaretBrush="White"
                                              SelectionBrush="White" SelectionOpacity="0.35"
-                                             FontFamily="{StaticResource sf_regular}" FontSize="13"
+                                             FontFamily="{StaticResource AppFont}" FontSize="13"
                                              Padding="10,0" VerticalContentAlignment="Center"
                                              TextChanged="UrlBox_TextChanged" />
                                     <TextBlock x:Name="UrlHint" Text="Paste or type a link"
-                                               Foreground="#FF7A7A7A" FontFamily="{StaticResource sf_regular}"
+                                               Foreground="#FF7A7A7A" FontFamily="{StaticResource AppFont}"
                                                FontSize="13" Margin="11,0,0,0"
                                                VerticalAlignment="Center" IsHitTestVisible="False" />
                                 </Grid>
@@ -823,17 +1191,32 @@
                         </Grid.RowDefinitions>
 
                         <TextBlock x:Name="NotifTitle" Grid.Row="0"
-                                   Foreground="White" FontFamily="{StaticResource sf_regular}"
+                                   Foreground="White" FontFamily="{StaticResource AppFont}"
                                    FontSize="13" FontWeight="SemiBold"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock x:Name="NotifBody" Grid.Row="1"
-                                   Foreground="#FFBDBDBD" FontFamily="{StaticResource sf_regular}"
+                                   Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
                                    FontSize="12"
                                    VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" />
                     </Grid>
                 </Grid>
+
+                <!-- The name of whatever the pointer is resting on: the plate a tooltip would
+                     have been. WPF draws it here rather than with a real tooltip because this
+                     window is never activated, and the tooltip service will not open one without
+                     an active window. It is the last thing in the island so that it can be read
+                     over the board, and it takes no pointer input of its own so that it is never
+                     in the way of the thing it is naming. -->
+                <Canvas x:Name="HoverCanvas" IsHitTestVisible="False">
+                    <Border x:Name="HoverName" Visibility="Collapsed"
+                            Background="#F21C1C1E" CornerRadius="7"
+                            BorderBrush="#33FFFFFF" BorderThickness="1" Padding="8,4">
+                        <TextBlock x:Name="HoverNameText" FontFamily="{StaticResource AppFont}"
+                                   FontSize="11" Foreground="#FFEDEDED" />
+                    </Border>
+                </Canvas>
             </Grid>
         </Border>
     </Grid>
