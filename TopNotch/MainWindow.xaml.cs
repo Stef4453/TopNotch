@@ -159,10 +159,12 @@ namespace TopNotch
             // it was built it would be a black rectangle across the top of the screen until the first
             // hover took it away.
             _summonTimer.Tick += SummonTimer_Tick;
+            _fullscreenTimer.Tick += FullscreenTimer_Tick;
             _hoverNameTimer.Tick += HoverNameTimer_Tick;
             Island.Width = PeekWidth;
             Island.Height = PeekHeight;
             ApplyStyle(instant: true);
+            WatchFullscreen();
         }
 
         // Keep this overlay out of Alt-Tab and make it non-activatable, so it can never
@@ -294,6 +296,11 @@ namespace TopNotch
             string currentAudio = _audio.DefaultDeviceName ?? "Connected Device";
             string cleanAudio = currentAudio.Replace("Headphones (", "").Replace("Speakers (", "").Replace(")", "").Trim();
             UpdateDeviceDisplay(cleanAudio, _audio.IsCurrentDeviceBluetooth);
+
+            // The check runs after everything else has been set up, so that a slow or unreachable
+            // GitHub cannot delay the island appearing. It says nothing unless there is something
+            // to say - see AnnounceUpdateAsync.
+            if (Settings.Current.CheckForUpdatesOnLaunch) _ = AnnounceUpdateAsync();
         }
 
         private void Last_Click(object sender, RoutedEventArgs e)
@@ -325,6 +332,11 @@ namespace TopNotch
         private void UpdateDeviceDisplay(string deviceName, bool isBluetooth)
         {
             DeviceNameText.Text = deviceName;
+
+            // The retracted island says the same thing the audio tab does, so there is no second
+            // idea about what a device is called.
+            PeekDevice.Text = deviceName;
+
             DeviceIcon.Source = isBluetooth ? _bluetoothAudioIcon : _audioIcon;
         }
 
@@ -375,6 +387,11 @@ namespace TopNotch
 
             UpdateClock();
             HistoryList.Items.Refresh();   // the history's own timestamps follow the same choice
+
+            // The fullscreen watch is only worth running while the setting asks for it, and turning
+            // it off has to let the island back at once rather than at the next slide of some
+            // fullscreen app.
+            WatchFullscreen();
         }
 
         private void UpdateSystemStats(double cpuPercent, double memoryPercent)
@@ -749,6 +766,15 @@ namespace TopNotch
         private double RestY => Floating ? EdgeOverlap - Math.Max(Island.Height, PeekHeight) - 10
                                          : NotchRestY;
 
+        // Where the island goes when an app has the whole screen. Deeper than either shape's own
+        // resting place, and measured from the tallest the island ever is, because a fullscreen app
+        // has asked for all of the screen and the notch's usual sliver is still part of it.
+        private const double AwayY = EdgeOverlap - ExpandedHeight;
+
+        // Where the island belongs, given everything that is on it: away for a fullscreen app, out
+        // for something that has to be read or reached for, and at rest otherwise.
+        private double HomeY => _away ? AwayY : Held ? HoverY : RestY;
+
         // A notification banner is as long as the expanded island but a fixed 66 tall. It used to be
         // "half the island", which stopped meaning anything once the island grew to make room for the
         // quick-action captions - the banner is its own thing and should not follow that.
@@ -787,12 +813,27 @@ namespace TopNotch
             Interval = TimeSpan.FromMilliseconds(110)
         };
 
+        // Whether a fullscreen app has the screen, and the watch that asks. The shell has no event
+        // for "the foreground went fullscreen", so it is asked four times a second: often enough
+        // that the island is gone before anything important has been drawn, and cheap enough that
+        // nobody could tell it was being asked.
+        private bool _away;
+
+        private readonly DispatcherTimer _fullscreenTimer = new(DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(400)
+        };
+
         // How much of the top of the screen belongs to the island: wide enough to be found without
         // aiming, and no wider than the thing being aimed at.
         private const double ReachWidth = 280;
 
         private void SummonTimer_Tick(object? sender, EventArgs e)
         {
+            // A fullscreen app has the screen: nothing reaches for the island over it, and nothing
+            // puts it anywhere while it is away.
+            if (_away) return;
+
             bool reaching = PointerAtIsland();
 
             // Out covers both the pill that is here and the one on its way back in: a pointer that
@@ -839,6 +880,9 @@ namespace TopNotch
 
         private void Zone_MouseEnter(object sender, MouseEventArgs e)
         {
+            // Nothing is answered while a fullscreen app has the screen.
+            if (_away) return;
+
             _hovered = true;
             UpdateContentVisibility();
             if (_notifying) return;   // the banner owns the island until it's dismissed
@@ -864,6 +908,9 @@ namespace TopNotch
         // depend on the shape and on how tall the island is at the time.
         private void ShowIsland()
         {
+            // A fullscreen app has the screen: nothing brings the island back over it.
+            if (_away) return;
+
             _pillLeaving = false;
             _pillOut = true;
             SlideIsland(HoverY);
@@ -880,7 +927,7 @@ namespace TopNotch
             if (_expanded || _pillLeaving) return;
             _pillLeaving = true;
 
-            SlideIsland(RestY, () =>
+            SlideIsland(HomeY, () =>
             {
                 // A fresh arrival may have taken the island over while this slide was running, and
                 // its own flag is what says whether it did.
@@ -921,6 +968,73 @@ namespace TopNotch
             if (done is not null) slide.Completed += (_, _) => done();
 
             IslandShift.BeginAnimation(TranslateTransform.YProperty, slide);
+        }
+
+        // ---- Fullscreen ----
+
+        // Asks the shell whether an app has the whole screen, and moves the island to where that
+        // answer says it should be. Only a change of answer does anything: the answers arrive several
+        // times a second, and moving the island on each one would be a slide that never stopped
+        // starting.
+        private void FullscreenTimer_Tick(object? sender, EventArgs e)
+        {
+            bool away = Fullscreen.Active;
+            if (away == _away) return;
+
+            StepAside(away);
+        }
+
+        // The watch runs only while the setting asks for it. Turning the setting off lets the island
+        // back at once, even if something is fullscreen at that moment: the switch is the promise,
+        // and this is the only thing that carries it out.
+        private void WatchFullscreen()
+        {
+            if (!Settings.Current.HideInFullscreen)
+            {
+                _fullscreenTimer.Stop();
+                if (_away) StepAside(false);
+                return;
+            }
+
+            if (!_fullscreenTimer.IsEnabled) _fullscreenTimer.Start();
+        }
+
+        // An app has the whole screen, or has given it back. Away, the island leaves the screen
+        // entirely rather than keeping the notch's sliver - a sliver is meant to be part of the
+        // screen's furniture, and a fullscreen app is looking at all of the screen - and it stops
+        // answering the pointer until the screen is given back.
+        //
+        // Nothing is thrown away on the way out: an island that was open is still open when it
+        // returns, and a banner that was up has already put itself away. The one thing let go of is
+        // the link box, because it is holding the keyboard, and a fullscreen app must have that.
+        private void StepAside(bool away)
+        {
+            _away = away;
+
+            _hovered = false;
+            ForgetHoverName();
+            HideUrlInput();
+
+            _pillLeaving = false;
+            _pillOut = false;
+
+            if (away)
+            {
+                // Quick and plain, without the spring it arrives with: this is not the island being
+                // handed to somebody, it is the island getting out of the way.
+                var leave = new DoubleAnimation(AwayY, TimeSpan.FromMilliseconds(220))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+                };
+
+                IslandShift.BeginAnimation(TranslateTransform.YProperty, leave);
+            }
+            else
+            {
+                SlideIsland(HomeY);
+            }
+
+            UpdateContentVisibility();
         }
 
         private void AnimateIslandSize(double width, double height)
@@ -987,16 +1101,18 @@ namespace TopNotch
             // shape is neither: the island has to reach the new shape's resting place whatever it
             // happened to be doing when the choice was made.
             _pillLeaving = false;
-            _pillOut = Held;
+            _pillOut = Held && !_away;
 
+            // Where it belongs also depends on whether an app has the screen: a fullscreen app is
+            // not a reason for the island to be out, whatever else was going on.
             if (instant)
             {
                 IslandShift.BeginAnimation(TranslateTransform.YProperty, null);
-                IslandShift.Y = Held ? HoverY : RestY;
+                IslandShift.Y = HomeY;
             }
             else
             {
-                SlideIsland(Held ? HoverY : RestY);
+                SlideIsland(HomeY);
             }
 
             UpdateContentVisibility();
@@ -1017,6 +1133,9 @@ namespace TopNotch
 
         private void Island_Click(object sender, MouseButtonEventArgs e)
         {
+            // Nothing on the island can be reached while a fullscreen app has the screen.
+            if (_away) return;
+
             if (_notifying)
             {
                 DismissNotification();   // clicking the banner dismisses it early
@@ -1188,6 +1307,12 @@ namespace TopNotch
         // RecordNotification, so status messages never turn up in the history tab.
         private void ShowBanner(string title, string body, ImageSource? icon)
         {
+            // A fullscreen app has the screen, and a banner over it is exactly the interruption that
+            // stepping aside is meant to avoid. The notification is not lost: it is written into the
+            // history before it is ever shown here, and the app's own status messages can wait for a
+            // moment when somebody is looking at the desktop.
+            if (_away) return;
+
             // A banner takes the island over, so an open link box can't stay: close it properly,
             // releasing the keyboard, rather than leaving it stranded underneath.
             if (_urlInputOpen) HideUrlInput();
@@ -1256,6 +1381,27 @@ namespace TopNotch
                 UpdateContentVisibility();
             };
             NotificationContent.BeginAnimation(OpacityProperty, fade);
+        }
+
+        // ---- Updates ----
+
+        // The start-up half of the update check, and the whole of its restraint: it only ever says
+        // anything when a newer release exists. An up-to-date copy, a project with nothing published
+        // yet, and a machine that cannot reach GitHub all look exactly alike from here - like
+        // nothing happened - which is the right amount of noise for an app starting up.
+        //
+        // What it says is a banner, and the banner names the place to act on it rather than being a
+        // button: the island's banners are for reading and dismissing, and the Settings window is
+        // already the one place that changes anything.
+        private async Task AnnounceUpdateAsync()
+        {
+            UpdateCheck.Result result = await UpdateCheck.RunAsync();
+            if (result.Status != UpdateCheck.Status.Newer) return;
+
+            // Away for a fullscreen app, the banner is suppressed along with every other one: the
+            // news is not lost, though - About still finds it, and the next start will say it again.
+            ShowBanner($"TopNotch {result.Version} is available",
+                       "Settings \u203A About has the details, and a way to get it.", null);
         }
 
         // ---- Link shortener ----

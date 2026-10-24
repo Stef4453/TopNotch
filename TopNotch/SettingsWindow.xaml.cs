@@ -12,9 +12,10 @@ namespace TopNotch
 {
     /// <summary>
     /// The app's settings, in the shape macOS gives its own: a sidebar of pages beside the page
-    /// itself. Two pages so far - General, which holds how the clock is written, which shape the
-    /// island wears and whether it is outlined, and API Keys - and the structure is the point: a
-    /// page is a sidebar row plus a pane.
+    /// itself. Three pages so far - General, which holds how the clock is written, which shape the
+    /// island wears and whether it is outlined; API Keys; and About, where the app's own version
+    /// lives and updates are looked for - and the structure is the point: a page is a sidebar row
+    /// plus a pane.
     ///
     /// There is no Save button, because there is nothing to confirm. Every change is written to
     /// %LOCALAPPDATA%\TopNotch\settings.json the moment it is made and the app is told, so the
@@ -29,6 +30,9 @@ namespace TopNotch
         /// the markup - the two have to agree.
         /// </summary>
         internal const string ApiKeysPage = "API Keys";
+
+        /// <summary>The sidebar tag of the About page, for the same reason and kept the same way.</summary>
+        internal const string AboutPage = "About";
 
         private readonly DispatcherTimer _sampleTimer = new() { Interval = TimeSpan.FromSeconds(1) };
         private bool _ready;
@@ -53,6 +57,15 @@ namespace TopNotch
             CardNotch.IsChecked = Settings.Current.IslandStyle == IslandStyle.Notch;
             CardIsland.IsChecked = Settings.Current.IslandStyle == IslandStyle.DynamicIsland;
             OutlineSwitch.IsChecked = Settings.Current.IslandOutline;
+            FullscreenSwitch.IsChecked = Settings.Current.HideInFullscreen;
+
+            LaunchCheckSwitch.IsChecked = Settings.Current.CheckForUpdatesOnLaunch;
+            AboutVersion.Text = $"Version {UpdateCheck.Current}";
+
+            // The start-up check may already have an answer. Showing it here is what keeps the
+            // banner's "Settings > About has the details" true even when the banner itself was
+            // dismissed, or never appeared because something was fullscreen at the time.
+            if (UpdateCheck.Last is { } last) ShowUpdateResult(last);
 
             _committedKey = Settings.Current.ImgBbApiKey;
             ApiKeyBox.Text = _committedKey;
@@ -92,6 +105,7 @@ namespace TopNotch
             {
                 yield return ("General", GeneralPane);
                 yield return (ApiKeysPage, ApiKeysPane);
+                yield return ("About", AboutPane);
             }
         }
 
@@ -118,6 +132,13 @@ namespace TopNotch
             foreach ((string name, UIElement pane) in Panes)
             {
                 pane.Visibility = name == page ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            // The About page always shows the last answer there is, whichever check produced it -
+            // and keeps showing it while this window is open, since nothing else changes it.
+            if (page == AboutPage && !_checking && UpdateCheck.Last is { } last)
+            {
+                ShowUpdateResult(last);
             }
         }
 
@@ -178,15 +199,90 @@ namespace TopNotch
             UpdateKeyState();
         }
 
-        private void OpenApiPage_Click(object sender, RoutedEventArgs e)
+        private void OpenApiPage_Click(object sender, RoutedEventArgs e) => OpenUrl("https://api.imgbb.com/");
+
+        // ---- About ----
+
+        // The last address a check offered, so that the download button has somewhere to send the
+        // person who presses it. Null until a newer release has been found.
+        private string? _newerUrl;
+
+        // A check is a round trip to GitHub, and the button stays where it is while it happens:
+        // this is what stops a second press from starting a second one.
+        private bool _checking;
+
+        private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+        {
+            if (_checking) return;
+
+            _checking = true;
+            CheckUpdatesButton.IsEnabled = false;
+            CheckUpdatesButton.Content = "Checking\u2026";
+            DownloadButton.Visibility = Visibility.Collapsed;
+            UpdateState.Text = "Asking GitHub\u2026";
+
+            try
+            {
+                ShowUpdateResult(await UpdateCheck.RunAsync());
+            }
+            finally
+            {
+                CheckUpdatesButton.Content = "Check Now";
+                CheckUpdatesButton.IsEnabled = true;
+                _checking = false;
+            }
+        }
+
+        // What the check came to, said as a sentence rather than a status: the answer is either a
+        // version to go and get, or a reason there is nothing to do. "No releases" is not a
+        // failure - it is an app that has not been published yet - so it is not dressed as one.
+        private void ShowUpdateResult(UpdateCheck.Result result)
+        {
+            _newerUrl = result.Url;
+            DownloadButton.Visibility = result.Status == UpdateCheck.Status.Newer
+                ? Visibility.Visible : Visibility.Collapsed;
+
+            UpdateState.Text = result.Status switch
+            {
+                UpdateCheck.Status.Newer =>
+                    $"Version {result.Version} is available. This copy is {UpdateCheck.Current}.",
+                UpdateCheck.Status.UpToDate =>
+                    $"TopNotch {UpdateCheck.Current} is the newest version.",
+                UpdateCheck.Status.NoReleases =>
+                    "Nothing has been published yet, so this copy is the newest there is.",
+                _ =>
+                    "Couldn't reach GitHub. Check the connection and try again."
+            };
+        }
+
+        // Nothing is downloaded or installed from here: an unsigned app cannot replace itself
+        // without the system rightly objecting, so the update is a release page, opened in whatever
+        // browser the machine uses.
+        private void DownloadUpdate_Click(object sender, RoutedEventArgs e) =>
+            OpenUrl(_newerUrl ?? UpdateCheck.Page);
+
+        private void OpenGitHub_Click(object sender, RoutedEventArgs e) => OpenUrl(UpdateCheck.Page);
+
+        // The launch check is the app's own promise rather than this window's, so nothing happens
+        // here beyond writing it down: the island reads it when it starts.
+        private void LaunchCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_ready) return;
+            Settings.Current.Set(() => Settings.Current.CheckForUpdatesOnLaunch =
+                LaunchCheckSwitch.IsChecked == true);
+        }
+
+        // Every link on these pages goes the same way: handed to the shell, so that whatever the
+        // machine uses for a browser answers. A machine with nothing to hand it to is not worth
+        // reporting - the address is written on the page either way.
+        private static void OpenUrl(string url)
         {
             try
             {
-                Process.Start(new ProcessStartInfo("https://api.imgbb.com/") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
             }
             catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
             {
-                // No browser to hand it to. Nothing to report: the address is written on the page.
             }
         }
 
@@ -243,6 +339,15 @@ namespace TopNotch
         {
             if (!_ready) return;
             Settings.Current.Set(() => Settings.Current.IslandOutline = OutlineSwitch.IsChecked == true);
+        }
+
+        // Whether the island gets out of the way of a fullscreen app. Turning it off lets the island
+        // back at once, even if something is fullscreen at that moment - the switch is the promise,
+        // and the island's own watch is only the thing that carries it out.
+        private void Fullscreen_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_ready) return;
+            Settings.Current.Set(() => Settings.Current.HideInFullscreen = FullscreenSwitch.IsChecked == true);
         }
 
         // The search reads the pages themselves, not only their names: someone hunting for the

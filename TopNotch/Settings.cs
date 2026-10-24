@@ -44,6 +44,8 @@ namespace TopNotch
         private IslandStyle _islandStyle = IslandStyle.Notch;
         private bool _islandOutline = true;
         private bool _launchpadIntroSeen;
+        private bool _hideInFullscreen = true;
+        private bool _checkForUpdatesOnLaunch = true;
 
         public static Settings Current { get; } = Load();
 
@@ -97,6 +99,39 @@ namespace TopNotch
             {
                 if (_islandOutline == value) return;
                 _islandOutline = value;
+                Changed?.Invoke();
+            }
+        }
+
+        /// <summary>
+        /// Whether the widget takes itself off the screen while an app is in fullscreen - a game, a
+        /// video, a presentation - and stops answering the pointer while it is away. On by default:
+        /// a fullscreen app has asked for the whole screen, and the notch's usual sliver of black is
+        /// still in the way of it.
+        /// </summary>
+        public bool HideInFullscreen
+        {
+            get => _hideInFullscreen;
+            set
+            {
+                if (_hideInFullscreen == value) return;
+                _hideInFullscreen = value;
+                Changed?.Invoke();
+            }
+        }
+
+        /// <summary>
+        /// Whether the app asks GitHub for a newer release on every start. On by default, and kept
+        /// quiet: the only time it says anything is when there is in fact something newer to get, so
+        /// the usual start - the usual one by definition - says nothing at all.
+        /// </summary>
+        public bool CheckForUpdatesOnLaunch
+        {
+            get => _checkForUpdatesOnLaunch;
+            set
+            {
+                if (_checkForUpdatesOnLaunch == value) return;
+                _checkForUpdatesOnLaunch = value;
                 Changed?.Invoke();
             }
         }

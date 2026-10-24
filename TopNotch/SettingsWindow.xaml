@@ -127,6 +127,39 @@
             </Setter>
         </Style>
 
+        <!-- A quiet button: the same shape as the accent one without the fill. For the second
+             action on a page - checking for updates, say - which is offered rather than urged. -->
+        <Style x:Key="QuietButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" Background="#3A3A3C" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#48484A" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#2C2C2E" />
+                            </Trigger>
+                            <!-- While a check is running the button is still there, in place, so
+                                 that the page does not jump: only its colour says it cannot be
+                                 pressed again. -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#8E8E93" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- A yes-or-no setting, drawn the way macOS draws one: a track with a knob that slides
              across it. The knob travels in a sixth of a second, and the accent comes up behind it as
              a second track fading in rather than as an animated brush, which is the shorter road to
@@ -283,6 +316,25 @@
                                        Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}" />
                         </Grid>
                     </ListBoxItem>
+
+                    <ListBoxItem Tag="About">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="20" Height="20" CornerRadius="5" Background="#8E8E93">
+                                <TextBlock Text="&#xE946;"
+                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                           FontSize="10" Foreground="White"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Grid.Column="1" FontSize="13" Margin="8,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding Tag, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}"
+                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type ListBoxItem}}}" />
+                        </Grid>
+                    </ListBoxItem>
                 </ListBox>
 
                 <!-- In place of the rows when a search has matched nothing. -->
@@ -397,6 +449,26 @@
                                               Checked="Outline_Changed" Unchecked="Outline_Changed" />
                             </Grid>
                         </Border>
+
+                        <TextBlock Text="Fullscreen" Style="{StaticResource SectionHeader}"
+                                   Margin="0,20,0,8" />
+
+                        <!-- Another row rather than a pair of cards: like the outline, it is a
+                             yes-or-no, and the sentence under the name says the whole of it. -->
+                        <Border Background="#2C2C2E" CornerRadius="9" Padding="14,10">
+                            <Grid>
+                                <StackPanel Margin="0,0,56,0">
+                                    <TextBlock Text="Step aside in fullscreen" FontSize="13" Foreground="#FFFFFF" />
+                                    <TextBlock Text="Takes the widget off the screen, and stops it answering the pointer, while a fullscreen app is in front. Notifications are still kept in the history."
+                                               FontSize="11" Foreground="#98989D" TextWrapping="Wrap"
+                                               Margin="0,3,0,0" />
+                                </StackPanel>
+                                <ToggleButton x:Name="FullscreenSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Top"
+                                              Margin="0,1,0,0"
+                                              Checked="Fullscreen_Changed" Unchecked="Fullscreen_Changed" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
 
                     <!-- API keys: the credentials the island's own features sign their requests
@@ -471,6 +543,84 @@
                         <Button Content="Open api.imgbb.com" Style="{StaticResource AccentButton}"
                                 HorizontalAlignment="Left" Margin="0,14,0,0"
                                 Click="OpenApiPage_Click" />
+                    </StackPanel>
+
+                    <!-- About: what this is, which version of it is running, and the one place the
+                         app talks to the internet about itself. Nothing here installs anything -
+                         signing would be needed before that could be honest - so an update is a
+                         release page to visit, and the button says so. -->
+                    <StackPanel x:Name="AboutPane" Margin="22,20,22,16" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <Image Source="/Sprites/tray.ico" Width="40" Height="40"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   VerticalAlignment="Top" />
+                            <StackPanel Margin="12,1,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="TopNotch" FontSize="17" FontWeight="SemiBold"
+                                           Foreground="#FFFFFF" />
+                                <TextBlock x:Name="AboutVersion" FontSize="12" Foreground="#98989D"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <TextBlock Text="A notch at the top of the screen: what is playing, what is making the sound, the notifications that just arrived, and a place for the things you are working on."
+                                   FontSize="12" Foreground="#98989D" TextWrapping="Wrap"
+                                   Margin="0,14,0,0" />
+
+                        <TextBlock Text="Updates" Style="{StaticResource SectionHeader}"
+                                   Margin="0,22,0,8" />
+
+                        <Border Background="#2C2C2E" CornerRadius="9" Padding="14,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Version" FontSize="13" Foreground="#FFFFFF" />
+                                    <TextBlock x:Name="UpdateState" FontSize="11" Foreground="#98989D"
+                                               TextWrapping="Wrap" Margin="0,3,0,0"
+                                               Text="Not checked yet." />
+                                </StackPanel>
+                                <!-- Both buttons are in the same row whether or not the download
+                                     one is showing, so the card does not change height when a
+                                     newer version turns up. -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <Button x:Name="CheckUpdatesButton" Content="Check Now"
+                                            Style="{StaticResource QuietButton}"
+                                            Click="CheckUpdates_Click" />
+                                    <Button x:Name="DownloadButton" Content="Download"
+                                            Style="{StaticResource AccentButton}" Margin="8,0,0,0"
+                                            Visibility="Collapsed"
+                                            Click="DownloadUpdate_Click" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Background="#2C2C2E" CornerRadius="9" Padding="14,10"
+                                Margin="0,8,0,0">
+                            <Grid>
+                                <StackPanel Margin="0,0,56,0">
+                                    <TextBlock Text="Check on launch" FontSize="13" Foreground="#FFFFFF" />
+                                    <TextBlock Text="Asks GitHub for a newer version when the app starts, and says so only if there is one."
+                                               FontSize="11" Foreground="#98989D" TextWrapping="Wrap"
+                                               Margin="0,3,0,0" />
+                                </StackPanel>
+                                <ToggleButton x:Name="LaunchCheckSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Top"
+                                              Margin="0,1,0,0"
+                                              Checked="LaunchCheck_Changed"
+                                              Unchecked="LaunchCheck_Changed" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="The check asks github.com for the newest release of this project. It sends nothing about you or this machine, and a copy that is already the newest is told nothing at all."
+                                   FontSize="11" Foreground="#8E8E93" TextWrapping="Wrap"
+                                   Margin="0,10,0,0" />
+
+                        <Button Content="Open the project on GitHub" Style="{StaticResource QuietButton}"
+                                HorizontalAlignment="Left" Margin="0,14,0,0"
+                                Click="OpenGitHub_Click" />
                     </StackPanel>
                 </Grid>
             </ScrollViewer>

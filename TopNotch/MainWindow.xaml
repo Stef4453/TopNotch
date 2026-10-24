@@ -1142,6 +1142,24 @@
                         </Image.Clip>
                     </Image>
 
+                    <!-- What the sound is coming out of. The retracted island is otherwise just the
+                         album art on one side and the privacy dots and waveform on the other, and
+                         the stretch between them is where a device name belongs. Equal margins on
+                         both sides centre the line in the island itself rather than in whatever
+                         space the dots happen to leave, and the margin is the same whether or not
+                         they are showing, so the line never shuffles sideways as they come and go.
+                         It is trimmed rather than wrapped: this is a label on a 32px capsule, and
+                         the start of a name is more use than none of it. -->
+                    <TextBlock x:Name="PeekDevice"
+                               Margin="32,0,32,0"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="#FFD6D6D8"
+                               FontFamily="{StaticResource AppFont}"
+                               FontSize="11"
+                               Text="Connected Device" />
+
                     <!-- Right-aligned row: privacy dots, then the playing waveform. The dots sit to
                          the left of the waveform while it's shown, and slide all the way to the right
                          when it's hidden. Each item is a clipped "slot" whose width and opacity are

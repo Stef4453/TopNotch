@@ -1,0 +1,93 @@
+name: Release
+
+# A release is a tag. Pushing v1.2.3 builds the app with that number written into it, zips the
+# published copy, and puts it on GitHub as a release - which is exactly what the app's own update
+# check looks for in Settings > About.
+#
+# The number has to be plain: 1.2.3, optionally with a fourth part. A tag with anything else in it
+# (-beta, a name) still builds and publishes, but is never offered as an update, because the app
+# cannot compare it with the version it is running.
+#
+# The executable is unsigned, so the first run of a downloaded copy is likely to meet SmartScreen.
+# Signing is the only honest fix for that, and it needs a certificate this workflow does not have.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, without the v (e.g. 1.2.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # One tag, whether it arrived as a pushed tag or was typed into the box on the Actions page,
+      # so that every step below can refer to the same name.
+      - name: Work out the version
+        id: version
+        shell: pwsh
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $tag = if ($env:EVENT -eq 'workflow_dispatch') {
+              "v" + $env:INPUT_VERSION.TrimStart('v')
+          } else {
+              $env:REF_NAME
+          }
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "number=$($tag.TrimStart('v'))" >> $env:GITHUB_OUTPUT
+
+      # Self-contained, because this is a download for somebody who should not have to install a
+      # runtime first: the .NET runtime travels in the download. Single-file bundles the managed
+      # assemblies into one executable; the handful of native libraries WPF needs sit beside it in
+      # the same zip, which is why the whole publish folder is packaged.
+      - name: Build
+        shell: pwsh
+        run: >
+          dotnet publish TopNotch/TopNotch.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:Version=${{ steps.version.outputs.number }}
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -o publish
+
+      - name: Package
+        shell: pwsh
+        run: >
+          Compress-Archive -Path publish/*
+          -DestinationPath "TopNotch-${{ steps.version.outputs.number }}-win-x64.zip"
+
+      # --generate-notes fills the release with the commits since the last one, so the page the app
+      # sends people to already says what changed.
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release create "${{ steps.version.outputs.tag }}"
+          "TopNotch-${{ steps.version.outputs.number }}-win-x64.zip"
+          --title "TopNotch ${{ steps.version.outputs.number }}"
+          --generate-notes
