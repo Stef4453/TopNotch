@@ -538,6 +538,23 @@
                             </Grid>
                         </Border>
 
+                        <Border Background="#2C2C2E" CornerRadius="9" Padding="14,10"
+                                Margin="0,8,0,0">
+                            <Grid>
+                                <StackPanel Margin="0,0,56,0">
+                                    <TextBlock Text="Include betas" FontSize="13" Foreground="#FFFFFF" />
+                                    <TextBlock Text="Also treats pre-release versions as updates. They are marked Beta and may be less stable."
+                                               FontSize="11" Foreground="#98989D" TextWrapping="Wrap"
+                                               Margin="0,3,0,0" />
+                                </StackPanel>
+                                <ToggleButton x:Name="BetaSwitch" Style="{StaticResource Switch}"
+                                              HorizontalAlignment="Right" VerticalAlignment="Top"
+                                              Margin="0,1,0,0"
+                                              Checked="Beta_Changed"
+                                              Unchecked="Beta_Changed" />
+                            </Grid>
+                        </Border>
+
                         <TextBlock Text="The check asks github.com for the newest release of this project. It sends nothing about you or this machine, and a copy that is already the newest is told nothing at all."
                                    FontSize="11" Foreground="#8E8E93" TextWrapping="Wrap"
                                    Margin="0,10,0,0" />

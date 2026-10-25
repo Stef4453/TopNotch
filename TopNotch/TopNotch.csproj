@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
 
-    <Version>1.0 Beta 1</Version>
+    <Version>1.0-beta.1</Version>
     <Product>TopNotch</Product>
   </PropertyGroup>
 

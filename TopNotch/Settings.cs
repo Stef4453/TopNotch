@@ -27,6 +27,7 @@ namespace TopNotch
         private bool _launchpadIntroSeen;
         private bool _hideInFullscreen = true;
         private bool _checkForUpdatesOnLaunch = true;
+        private bool _includePrereleaseUpdates;
 
         public static Settings Current { get; } = Load();
 
@@ -88,6 +89,17 @@ namespace TopNotch
             {
                 if (_checkForUpdatesOnLaunch == value) return;
                 _checkForUpdatesOnLaunch = value;
+                Changed?.Invoke();
+            }
+        }
+
+        public bool IncludePrereleaseUpdates
+        {
+            get => _includePrereleaseUpdates;
+            set
+            {
+                if (_includePrereleaseUpdates == value) return;
+                _includePrereleaseUpdates = value;
                 Changed?.Invoke();
             }
         }

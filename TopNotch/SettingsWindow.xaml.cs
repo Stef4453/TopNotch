@@ -35,7 +35,8 @@ namespace TopNotch
             FullscreenSwitch.IsChecked = Settings.Current.HideInFullscreen;
 
             LaunchCheckSwitch.IsChecked = Settings.Current.CheckForUpdatesOnLaunch;
-            AboutVersion.Text = $"Version {UpdateCheck.Current}";
+            BetaSwitch.IsChecked = Settings.Current.IncludePrereleaseUpdates;
+            AboutVersion.Text = $"Version {UpdateCheck.CurrentLabel}";
 
             if (UpdateCheck.Last is { } last) ShowUpdateResult(last);
 
@@ -165,7 +166,8 @@ namespace TopNotch
 
             try
             {
-                ShowUpdateResult(await UpdateCheck.RunAsync());
+                ShowUpdateResult(await UpdateCheck.RunAsync(
+                    Settings.Current.IncludePrereleaseUpdates));
             }
             finally
             {
@@ -177,6 +179,8 @@ namespace TopNotch
 
         private void ShowUpdateResult(UpdateCheck.Result result)
         {
+            AboutVersion.Text = $"Version {UpdateCheck.CurrentLabel}";
+
             _newerUrl = result.Url;
             DownloadButton.Visibility = result.Status == UpdateCheck.Status.Newer
                 ? Visibility.Visible : Visibility.Collapsed;
@@ -184,9 +188,9 @@ namespace TopNotch
             UpdateState.Text = result.Status switch
             {
                 UpdateCheck.Status.Newer =>
-                    $"Version {result.Version} is available. This copy is {UpdateCheck.Current}.",
+                    $"Version {result.Version} is available. This copy is {UpdateCheck.CurrentLabel}.",
                 UpdateCheck.Status.UpToDate =>
-                    $"TopNotch {UpdateCheck.Current} is the newest version.",
+                    $"TopNotch {UpdateCheck.CurrentLabel} is the newest version.",
                 UpdateCheck.Status.NoReleases =>
                     "Nothing has been published yet, so this copy is the newest there is.",
                 _ =>
@@ -198,6 +202,16 @@ namespace TopNotch
             OpenUrl(_newerUrl ?? UpdateCheck.Page);
 
         private void OpenGitHub_Click(object sender, RoutedEventArgs e) => OpenUrl(UpdateCheck.Page);
+
+        private void Beta_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!_ready) return;
+
+            Settings.Current.Set(() => Settings.Current.IncludePrereleaseUpdates =
+                BetaSwitch.IsChecked == true);
+
+            if (UpdateCheck.Last is not null) CheckUpdates_Click(this, new RoutedEventArgs());
+        }
 
         private void LaunchCheck_Changed(object sender, RoutedEventArgs e)
         {

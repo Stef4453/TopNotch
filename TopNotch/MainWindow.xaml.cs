@@ -1098,7 +1098,8 @@ namespace TopNotch
 
         private async Task AnnounceUpdateAsync()
         {
-            UpdateCheck.Result result = await UpdateCheck.RunAsync();
+            UpdateCheck.Result result = await UpdateCheck.RunAsync(
+                Settings.Current.IncludePrereleaseUpdates);
             if (result.Status != UpdateCheck.Status.Newer) return;
 
             ShowBanner($"TopNotch {result.Version} is available",
