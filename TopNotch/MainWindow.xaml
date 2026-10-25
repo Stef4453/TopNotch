@@ -1,0 +1,1019 @@
+<Window x:Name="Notch" x:Class="TopNotch.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:TopNotch"
+        mc:Ignorable="d"
+         WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        ResizeMode="NoResize"
+        Width="500" Height="180"
+        Loaded="Window_Loaded"
+        RenderOptions.BitmapScalingMode="HighQuality"
+        FontFamily="{StaticResource AppFont}">
+
+    <Window.Resources>
+        <Style TargetType="Image">
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality" />
+        </Style>
+
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="1" ScaleY="1" />
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.85" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="RenderTransform">
+                        <Setter.Value>
+                            <ScaleTransform ScaleX="0.88" ScaleY="0.88" />
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="QuickActionButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="#22FFFFFF" CornerRadius="11">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#3AFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#4DFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="QuickActionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFB4B4B4" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="LineHeight" Value="15" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="LaunchpadTile" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Background="Transparent">
+                            <Grid Width="44" Height="44"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Border x:Name="Plate" CornerRadius="12"
+                                        Background="Transparent" BorderBrush="#73FFFFFF" BorderThickness="1" />
+
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                                <Button x:Name="Remove" Style="{StaticResource IconButton}"
+                                        Width="15" Height="15"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        Margin="0,-4,-4,0" Opacity="0" Visibility="Collapsed"
+                                        ToolTip="Remove" ToolTipService.IsEnabled="False"
+                                        Click="LaunchpadRemove_Click">
+                                    <Border Background="#E6000000" CornerRadius="7.5"
+                                            BorderBrush="#66FFFFFF" BorderThickness="1">
+                                        <TextBlock Text="&#xE711;"
+                                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                   FontSize="8" Foreground="White"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </Button>
+                            </Grid>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="#1AFFFFFF" />
+                                <Setter TargetName="Remove" Property="Opacity" Value="1" />
+                            </Trigger>
+
+                            <DataTrigger Binding="{Binding IsEmpty}" Value="False">
+                                <Setter TargetName="Plate" Property="BorderBrush" Value="Transparent" />
+                                <Setter TargetName="Remove" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter TargetName="Plate" Property="Background" Value="#33FFFFFF" />
+                                <Setter TargetName="Plate" Property="BorderBrush" Value="White" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+
+                <DataTrigger Binding="{Binding IsEmpty}" Value="False">
+                    <Setter Property="ToolTip" Value="{Binding Name}" />
+                    <Setter Property="ToolTipService.IsEnabled" Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate x:Key="LaunchpadTileTemplate">
+            <Button Style="{StaticResource LaunchpadTile}" Click="LaunchpadTile_Click">
+                <Grid>
+                    <Grid x:Name="Plus" Width="16" Height="16">
+                        <Rectangle Width="16" Height="1.5" RadiusX="0.75" RadiusY="0.75" Fill="#8CFFFFFF"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Rectangle Width="1.5" Height="16" RadiusX="0.75" RadiusY="0.75" Fill="#8CFFFFFF"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Image x:Name="Icon" Source="{Binding Icon}" Width="44" Height="44"
+                           Visibility="Collapsed">
+                        <Image.Clip>
+                            <RectangleGeometry Rect="0,0,44,44" RadiusX="12" RadiusY="12" />
+                        </Image.Clip>
+                    </Image>
+
+                    <TextBlock x:Name="Initial" Text="{Binding Initial}" Visibility="Collapsed"
+                               Foreground="#B3FFFFFF" FontSize="17" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsEmpty}" Value="False">
+                    <Setter TargetName="Plus" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="Icon" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasIcon}" Value="False">
+                    <Setter TargetName="Icon" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="Initial" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ClipboardFileTemplate">
+            <Border x:Name="Plate"
+                    Width="44" Height="44" CornerRadius="12"
+                    Background="Transparent" Cursor="Hand"
+                    ToolTip="{Binding Name}" ToolTipService.IsEnabled="False"
+                    MouseLeftButtonDown="ClipboardFile_Down">
+                <Grid>
+                    <Image x:Name="Preview" Source="{Binding Preview}"
+                           Width="44" Height="44" Stretch="Uniform" Visibility="Collapsed" />
+
+                    <TextBlock x:Name="Initial" Text="{Binding Initial}" Visibility="Collapsed"
+                               Foreground="#B3FFFFFF" FontSize="17" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                    <Button x:Name="Remove" Style="{StaticResource IconButton}"
+                            Width="15" Height="15"
+                            HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Margin="0,-4,-4,0" Opacity="0"
+                            ToolTip="Remove" ToolTipService.IsEnabled="False"
+                            Click="ClipboardRemove_Click">
+                        <Border Background="#E6000000" CornerRadius="7.5"
+                                BorderBrush="#66FFFFFF" BorderThickness="1">
+                            <TextBlock Text="&#xE711;"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       FontSize="8" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <DataTemplate.Triggers>
+                <Trigger SourceName="Plate" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Plate" Property="Background" Value="#1AFFFFFF" />
+                    <Setter TargetName="Remove" Property="Opacity" Value="1" />
+                </Trigger>
+
+                <DataTrigger Binding="{Binding IsDragging}" Value="True">
+                    <Setter TargetName="Plate" Property="Background" Value="#33FFFFFF" />
+                    <Setter TargetName="Remove" Property="Opacity" Value="0" />
+                </DataTrigger>
+
+                <DataTrigger Binding="{Binding HasPreview}" Value="True">
+                    <Setter TargetName="Preview" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasPreview}" Value="False">
+                    <Setter TargetName="Initial" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#F21C1C1E" />
+            <Setter Property="Foreground" Value="#FFEDEDED" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="HasDropShadow" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}"
+                                BorderBrush="#33FFFFFF" BorderThickness="1">
+                            <ContentPresenter />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TabButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="#FF9A9A9A" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="0,1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ConfirmCancelButton" TargetType="Button">
+            <Setter Property="Background" Value="#1AFFFFFF" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="13,4" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}"
+                                CornerRadius="12" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#38FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#52FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ConfirmAcceptButton" TargetType="Button" BasedOn="{StaticResource ConfirmCancelButton}">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="Foreground" Value="Black" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}"
+                                CornerRadius="12" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#CCFFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#A6FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="KnoblessSlider" TargetType="{x:Type local:KnoblessSlider}">
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Background" Value="#555555"/>
+            <Setter Property="Foreground" Value="White"/>
+
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type local:KnoblessSlider}">
+                        <Grid Background="Transparent"
+                      VerticalAlignment="Center">
+
+                            <Track x:Name="PART_Track"
+                           Height="6"
+                           IsDirectionReversed="False">
+
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton
+                                Background="{TemplateBinding Foreground}"
+                                BorderThickness="0"
+                                Focusable="False"
+                                IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border
+                                            Background="{TemplateBinding Background}"
+                                            CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="0"
+                                Focusable="False"
+                                IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border
+                                            Background="{TemplateBinding Background}"
+                                            CornerRadius="3"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+
+                                <Track.Thumb>
+                                    <Thumb Width="0"
+                                   Height="0"
+                                   Opacity="0"
+                                   Focusable="False"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="HoverZone"
+      Background="Transparent"
+      Width="460" Height="142"
+      HorizontalAlignment="Center" VerticalAlignment="Top"
+      MouseEnter="Zone_MouseEnter"
+      MouseLeave="Zone_MouseLeave" Margin="0,-3,0,0"
+      AllowDrop="True"
+      DragOver="Island_DragOver"
+      DragLeave="Island_DragLeave"
+      Drop="Island_Drop">
+
+        <Border x:Name="Island"
+        Background="Black"
+        CornerRadius="0,0,20,20"
+        Width="460" Height="142"
+        VerticalAlignment="Top"
+        MouseLeftButtonDown="Island_Click"
+        MouseMove="Island_MouseMove"
+        MouseLeave="Island_MouseLeave">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="IslandShift" Y="-0" />
+            </Border.RenderTransform>
+
+            <Grid>
+                <Grid x:Name="ExpandedContent" Visibility="Visible" ClipToBounds="True">
+                    <Grid Margin="16,6,16,6">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,1,0,3">
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="HomeTab" Content="Home" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="HomeUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" />
+                            </StackPanel>
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="MediaTab" Content="Media" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="MediaUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" Opacity="0" />
+                            </StackPanel>
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="HistoryTab" Content="History" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="HistoryUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" Opacity="0" />
+                            </StackPanel>
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="LaunchpadTab" Content="Launchpad" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="LaunchpadUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" Opacity="0" />
+                            </StackPanel>
+                            <StackPanel Margin="9,0">
+                                <Button x:Name="ClipboardTab" Content="Clipboard" Style="{StaticResource TabButton}" Click="Tab_Click" />
+                                <Border x:Name="ClipboardUnderline" Height="3" CornerRadius="1.5"
+                                        Background="White" Margin="0,3,0,0" Opacity="0" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Grid Grid.Row="1" ClipToBounds="True">
+                            <Grid x:Name="TabContentHost">
+                                <Grid.RenderTransform>
+                                    <TranslateTransform x:Name="TabContentShift" />
+                                </Grid.RenderTransform>
+
+                                <Grid x:Name="HomeContent" Visibility="Visible">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Grid Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="40" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="30" />
+                                            <RowDefinition Height="6" />
+                                            <RowDefinition Height="30" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <Button Grid.Row="1" Grid.Column="0" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Power"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="Shutdown_Click">
+                                            <Image Source="/Sprites/power.png" Width="27" Height="27" />
+                                        </Button>
+
+                                        <Button Grid.Row="1" Grid.Column="1" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Restart"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="Restart_Click">
+                                            <Image Source="/Sprites/restart.png" Width="27" Height="27" />
+                                        </Button>
+
+                                        <Button Grid.Row="3" Grid.Column="0" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Sleep"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="Sleep_Click">
+                                            <Image Source="/Sprites/sleep.png" Width="23" Height="23" />
+                                        </Button>
+
+                                        <Button Grid.Row="3" Grid.Column="1" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Lock"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="Lock_Click">
+                                            <Image Source="/Sprites/lock.png" Width="25" Height="25" />
+                                        </Button>
+
+                                        <Button Grid.Row="1" Grid.Column="2" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Shorten Link"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="ShortenUrl_Click">
+                                            <Image Source="/Sprites/link.png" Width="22" Height="22" />
+                                        </Button>
+
+                                        <Button x:Name="ShareImageButton"
+                                                Grid.Row="3" Grid.Column="2" Style="{StaticResource QuickActionButton}"
+                                                Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Tag="Share Image"
+                                                MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
+                                                Click="ShareImage_Click">
+                                            <Image Source="/Sprites/picture.png" Width="33" Height="33" />
+                                        </Button>
+
+                                        <TextBlock x:Name="TopRowCaption" Grid.Row="0" Grid.ColumnSpan="3"
+                                                   VerticalAlignment="Bottom" Margin="0,0,0,2" Opacity="0"
+                                                   Style="{StaticResource QuickActionLabel}">
+                                            <TextBlock.RenderTransform>
+                                                <TranslateTransform x:Name="TopRowCaptionShift" />
+                                            </TextBlock.RenderTransform>
+                                        </TextBlock>
+
+                                        <TextBlock x:Name="BottomRowCaption" Grid.Row="4" Grid.ColumnSpan="3"
+                                                   VerticalAlignment="Top" Margin="0,2,0,0" Opacity="0"
+                                                   Style="{StaticResource QuickActionLabel}">
+                                            <TextBlock.RenderTransform>
+                                                <TranslateTransform x:Name="BottomRowCaptionShift" />
+                                            </TextBlock.RenderTransform>
+                                        </TextBlock>
+                                    </Grid>
+
+                                    <StackPanel Grid.Column="0" Grid.ColumnSpan="3"
+                                                VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <TextBlock Foreground="White" FontFamily="{StaticResource AppFont}"
+                                                   FontSize="40" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Left"><Run x:Name="ClockTimeRun" Text="--:--" /><Run x:Name="ClockMeridiemRun" Text=" --" FontSize="20" /></TextBlock>
+                                        <TextBlock x:Name="DateText" Text=""
+                                                   Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
+                                                   FontSize="13"
+                                                   Margin="3,3,0,0" HorizontalAlignment="Left" />
+                                    </StackPanel>
+
+                                    <Grid Grid.Column="2" Width="120" HorizontalAlignment="Right"
+                                          Height="88" VerticalAlignment="Center">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <Grid Grid.Row="0" VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0" Text="CPU"
+                                                       Foreground="White" FontFamily="{StaticResource AppFont}"
+                                                       FontSize="11" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Left" />
+                                            <TextBlock x:Name="CpuPercentText" Grid.Row="0" Text="--%"
+                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
+                                                       FontSize="10"
+                                                       HorizontalAlignment="Right" />
+
+                                            <Border x:Name="CpuTrack" Grid.Row="1" Height="4" CornerRadius="2"
+                                                    Background="#3D3D3D" Margin="0,3,0,0">
+                                                <Border x:Name="CpuFill" Height="4" CornerRadius="2"
+                                                        Background="White" HorizontalAlignment="Left" Width="0" />
+                                            </Border>
+                                        </Grid>
+
+                                        <Grid Grid.Row="1" VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0" Text="Memory"
+                                                       Foreground="White" FontFamily="{StaticResource AppFont}"
+                                                       FontSize="11" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Left" />
+                                            <TextBlock x:Name="MemoryPercentText" Grid.Row="0" Text="--%"
+                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
+                                                       FontSize="10"
+                                                       HorizontalAlignment="Right" />
+
+                                            <Border x:Name="MemoryTrack" Grid.Row="1" Height="4" CornerRadius="2"
+                                                    Background="#3D3D3D" Margin="0,3,0,0">
+                                                <Border x:Name="MemoryFill" Height="4" CornerRadius="2"
+                                                        Background="White" HorizontalAlignment="Left" Width="0" />
+                                            </Border>
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+
+                                <Grid x:Name="MediaContent" Visibility="Collapsed"
+                                      Height="88" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="7*" />
+                                        <ColumnDefinition Width="3*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Grid Grid.Column="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="64" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Image x:Name="AlbumCover" HorizontalAlignment="Center" Height="50"
+                                       VerticalAlignment="Top" Width="50"
+                                       Source="/Sprites/Empty.png" RenderTransformOrigin="0.5,0.5">
+                                            <Image.Clip>
+                                                <RectangleGeometry Rect="0,0,50,50" RadiusX="15" RadiusY="15" />
+                                            </Image.Clip>
+                                        </Image>
+
+                                        <Grid Grid.Column="1" Margin="8,0,0,0" ClipToBounds="True">
+                                            <Grid x:Name="TrackInfoPanel">
+                                                <Grid.RenderTransform>
+                                                    <TranslateTransform x:Name="TrackInfoShift" />
+                                                </Grid.RenderTransform>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+
+                                                <TextBlock x:Name="TrackTitle" Text="Track"
+                                           Foreground="White" FontFamily="{StaticResource AppFont}"
+                                           VerticalAlignment="Center" Height="24"
+                                           TextTrimming="CharacterEllipsis" TextAlignment="Left" HorizontalAlignment="Left" Width="175" />
+                                                <TextBlock x:Name="ArtistName" Text="Artist" Grid.Row="1"
+                                           Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
+                                           VerticalAlignment="Center" Height="24"
+                                           TextTrimming="CharacterEllipsis" TextAlignment="Left" HorizontalAlignment="Left" />
+                                            </Grid>
+                                        </Grid>
+
+                                        <StackPanel Grid.ColumnSpan="2" Orientation="Horizontal"
+                                                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4">
+                                            <Button x:Name="LastButton" Style="{StaticResource IconButton}"
+                                                Width="28" Height="28" Margin="8,0"
+                                                Click="Last_Click">
+                                                <Image x:Name="Last" Source="/Sprites/back.png" />
+                                            </Button>
+                                            <Button x:Name="PlayPauseButton" Style="{StaticResource IconButton}"
+                                                Width="28" Height="28" Margin="8,0"
+                                                Click="PlayPause_Click">
+                                                <Image x:Name="PlayPause" Source="/Sprites/play.png" />
+                                            </Button>
+                                            <Button x:Name="NextButton" Style="{StaticResource IconButton}"
+                                                Width="28" Height="28" Margin="8,0"
+                                                Click="Next_Click">
+                                                <Image x:Name="Next" Source="/Sprites/forward.png" />
+                                            </Button>
+                                        </StackPanel>
+
+                                        <local:GifImage x:Name="ExpandedWave" Grid.ColumnSpan="2"
+                                                        SourceUri="/Sprites/music_waveform.gif"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                        Height="16" Width="16" Margin="0,0,8,4"
+                                                        RenderOptions.BitmapScalingMode="HighQuality"
+                                                        Visibility="Collapsed" />
+                                    </Grid>
+
+                                    <Border Grid.Column="0" Width="1"
+                                            HorizontalAlignment="Right"
+                                            Background="#33FFFFFF"
+                                            Margin="0,6,0,6" />
+
+                                    <Grid Grid.Column="1" Margin="10,0,0,0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+
+                                        <Image x:Name="DeviceIcon" Grid.Row="0"
+                                               Height="16" Width="16"
+                                               HorizontalAlignment="Center"
+                                               Source="/Sprites/bluetooth_audio.png"
+                                               SnapsToDevicePixels="True"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                        <TextBlock x:Name="DeviceNameText" Grid.Row="1"
+                                                   Text="Connected Device"
+                                                   Foreground="White" FontFamily="{StaticResource AppFont}"
+                                                   FontSize="14" FontWeight="SemiBold"
+                                                   TextAlignment="Center" VerticalAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ClipToBounds="True"
+                                                   Height="36"
+                                                   Margin="0,2,0,0" />
+
+                                        <local:KnoblessSlider x:Name="Volume" Grid.Row="2"
+                                            Style="{StaticResource KnoblessSlider}"
+                                            VerticalAlignment="Center"
+                                            Minimum="0" Maximum="100"
+                                            Margin="0,0,0,2" Height="20" Cursor="Hand" />
+                                    </Grid>
+                                </Grid>
+
+                                <Grid x:Name="HistoryContent" Visibility="Collapsed">
+                                    <local:SnapScrollViewer x:Name="HistoryScroller"
+                                                            SnapInterval="36"
+                                                            VerticalScrollBarVisibility="Hidden"
+                                                            HorizontalScrollBarVisibility="Disabled"
+                                                            Focusable="False"
+                                                            ClipToBounds="True">
+                                        <ItemsControl x:Name="HistoryList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Height="{Binding SnapInterval, RelativeSource={RelativeSource AncestorType={x:Type local:SnapScrollViewer}}}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Image Grid.Column="0" Width="24" Height="24"
+                                                               VerticalAlignment="Center"
+                                                               Source="{Binding Icon}">
+                                                            <Image.Clip>
+                                                                <RectangleGeometry Rect="0,0,24,24" RadiusX="6" RadiusY="6" />
+                                                            </Image.Clip>
+                                                        </Image>
+
+                                                        <Grid Grid.Column="1" Margin="8,0,0,0">
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="*" />
+                                                                <RowDefinition Height="*" />
+                                                            </Grid.RowDefinitions>
+
+                                                            <TextBlock Grid.Row="0" Text="{Binding Title}"
+                                                                       Foreground="White" FontFamily="{StaticResource AppFont}"
+                                                                       FontSize="12" FontWeight="SemiBold"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Row="1" Text="{Binding Body}"
+                                                                       Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
+                                                                       FontSize="11"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
+
+                                                        <TextBlock Grid.Column="2" Text="{Binding TimeText}"
+                                                                   Foreground="#FF7A7A7A" FontFamily="{StaticResource AppFont}"
+                                                                   FontSize="10"
+                                                                   VerticalAlignment="Center" Margin="8,0,0,0" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </local:SnapScrollViewer>
+
+                                    <TextBlock x:Name="HistoryEmpty" Text="No notifications yet"
+                                               Foreground="#FF8A8A8A" FontFamily="{StaticResource AppFont}"
+                                               FontSize="12"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <Grid x:Name="LaunchpadContent" Visibility="Collapsed">
+                                    <ItemsControl x:Name="LaunchpadList"
+                                                  ItemTemplate="{StaticResource LaunchpadTileTemplate}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <UniformGrid Rows="2" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                    </ItemsControl>
+
+                                    <Grid x:Name="LaunchpadIntro" Background="Black"
+                                          Visibility="Collapsed"
+                                          MouseLeftButtonDown="LaunchpadIntro_Click">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center"
+                                                    Margin="2,0,0,0">
+                                            <TextBlock Text="Your Launchpad"
+                                                       Foreground="White"
+                                                       FontFamily="{StaticResource AppFont}"
+                                                       FontSize="13" FontWeight="SemiBold" />
+
+                                            <TextBlock Margin="0,5,0,0"
+                                                       Foreground="#FFB4B4B4"
+                                                       FontFamily="{StaticResource AppFont}"
+                                                       FontSize="11" LineHeight="15"
+                                                       LineStackingStrategy="BlockLineHeight"
+                                                       TextWrapping="Wrap"
+                                                       Text="Drag an app onto a square to keep it here." />
+
+                                            <TextBlock Margin="0,2,0,0"
+                                                       Foreground="#FFB4B4B4"
+                                                       FontFamily="{StaticResource AppFont}"
+                                                       FontSize="11" LineHeight="15"
+                                                       LineStackingStrategy="BlockLineHeight"
+                                                       TextWrapping="Wrap"
+                                                       Text="Click a square to pick an app from your PC." />
+
+                                            <TextBlock Margin="0,2,0,0"
+                                                       Foreground="#FFB4B4B4"
+                                                       FontFamily="{StaticResource AppFont}"
+                                                       FontSize="11" LineHeight="15"
+                                                       LineStackingStrategy="BlockLineHeight"
+                                                       TextWrapping="Wrap"
+                                                       Text="Click a tile to open it. Hover it and click × to remove." />
+                                        </StackPanel>
+
+                                        <Button Grid.Column="1" Content="OK"
+                                                Style="{StaticResource ConfirmAcceptButton}"
+                                                VerticalAlignment="Center" Margin="14,0,0,0"
+                                                Click="LaunchpadIntro_Click" />
+                                    </Grid>
+                                </Grid>
+
+                                <Grid x:Name="ClipboardContent" Visibility="Collapsed">
+                                    <Border x:Name="ClipboardBoard" CornerRadius="12"
+                                            BorderThickness="1" BorderBrush="Transparent"
+                                            IsHitTestVisible="False" />
+
+                                    <ItemsControl x:Name="ClipboardList"
+                                                  ItemTemplate="{StaticResource ClipboardFileTemplate}"
+                                                  Margin="3"
+                                                  SizeChanged="ClipboardList_SizeChanged"
+                                                  MouseMove="ClipboardList_Move"
+                                                  MouseLeftButtonUp="ClipboardList_Up"
+                                                  LostMouseCapture="ClipboardList_LostCapture">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <Canvas />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                                <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
+                                    </ItemsControl>
+
+                                    <StackPanel x:Name="ClipboardHint" IsHitTestVisible="False"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasItems, ElementName=ClipboardList}"
+                                                                 Value="False">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+
+                                        <TextBlock Text="Drag files here"
+                                                   Foreground="#FFB4B4B4"
+                                                   FontFamily="{StaticResource AppFont}"
+                                                   FontSize="13" HorizontalAlignment="Center" />
+
+                                        <TextBlock Margin="0,3,0,0"
+                                                   Text="Double-click one to open it · Drag anywhere · Hover it and click × to remove"
+                                                   Foreground="#8CFFFFFF"
+                                                   FontFamily="{StaticResource AppFont}"
+                                                   FontSize="11" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+
+                    <Border x:Name="ConfirmOverlay" Background="Black" CornerRadius="0,0,20,20"
+                            Visibility="Collapsed">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock x:Name="ConfirmPrompt" Text="Shut down?"
+                                       Foreground="White" FontFamily="{StaticResource AppFont}"
+                                       FontSize="15" FontWeight="SemiBold"
+                                       TextAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                        Margin="0,10,0,0">
+                                <Button Content="Cancel" Style="{StaticResource ConfirmCancelButton}"
+                                        Click="ConfirmCancel_Click" />
+                                <Button x:Name="ConfirmAccept" Content="Shut down"
+                                        Style="{StaticResource ConfirmAcceptButton}"
+                                        Margin="8,0,0,0" Click="ConfirmAccept_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="UrlOverlay" Background="Black" CornerRadius="0,0,20,20"
+                            Visibility="Collapsed"
+                            PreviewKeyDown="UrlOverlay_PreviewKeyDown">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Width="428">
+                            <Border Background="#1AFFFFFF" CornerRadius="10" Height="34">
+                                <Grid>
+                                    <TextBox x:Name="UrlBox"
+                                             Background="Transparent" BorderThickness="0"
+                                             Foreground="White" CaretBrush="White"
+                                             SelectionBrush="White" SelectionOpacity="0.35"
+                                             FontFamily="{StaticResource AppFont}" FontSize="13"
+                                             Padding="10,0" VerticalContentAlignment="Center"
+                                             TextChanged="UrlBox_TextChanged" />
+                                    <TextBlock x:Name="UrlHint" Text="Paste or type a link"
+                                               Foreground="#FF7A7A7A" FontFamily="{StaticResource AppFont}"
+                                               FontSize="13" Margin="11,0,0,0"
+                                               VerticalAlignment="Center" IsHitTestVisible="False" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"
+                                        Margin="0,10,0,0">
+                                <Button Content="Cancel" Style="{StaticResource ConfirmCancelButton}"
+                                        Click="UrlCancel_Click" />
+                                <Button Content="Shorten" Style="{StaticResource ConfirmAcceptButton}"
+                                        Margin="8,0,0,0" Click="UrlShorten_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Grid x:Name="PeekContent" Visibility="Collapsed">
+                    <Image x:Name="PeekAlbumCover" HorizontalAlignment="Left"
+                       Height="20" Width="20" Margin="8,0,0,0"
+                       VerticalAlignment="Center">
+                        <Image.Clip>
+                            <RectangleGeometry Rect="0,0,20,20" RadiusX="5" RadiusY="5" />
+                        </Image.Clip>
+                    </Image>
+
+                    <TextBlock x:Name="PeekDevice"
+                               Margin="32,0,32,0"
+                               VerticalAlignment="Center"
+                               TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="#FFD6D6D8"
+                               FontFamily="{StaticResource AppFont}"
+                               FontSize="11"
+                               Text="Connected Device" />
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Margin="0,0,10,0">
+                        <Border x:Name="MicSlot" Width="0" VerticalAlignment="Center"
+                                ClipToBounds="True" Visibility="Collapsed">
+                            <Ellipse x:Name="MicDot" Width="8" Height="8" HorizontalAlignment="Left"
+                                     Fill="#FFFF9F0A" />
+                        </Border>
+                        <Border x:Name="CameraSlot" Width="0" Padding="5,0,0,0" VerticalAlignment="Center"
+                                ClipToBounds="True" Visibility="Collapsed">
+                            <Ellipse x:Name="CameraDot" Width="8" Height="8" HorizontalAlignment="Left"
+                                     Fill="#FF30D158" />
+                        </Border>
+                        <Border x:Name="WaveSlot" Width="0" Padding="6,0,0,0" VerticalAlignment="Center"
+                                ClipToBounds="True" Visibility="Collapsed">
+                            <local:GifImage x:Name="PeekWave"
+                                            SourceUri="/Sprites/music_waveform.gif"
+                                            Height="16" Width="16" HorizontalAlignment="Left"
+                                            RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <Grid x:Name="NotificationContent" Visibility="Collapsed" Margin="14,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Image x:Name="NotifIcon" Grid.Column="0" Width="44" Height="44"
+                           VerticalAlignment="Center">
+                        <Image.Clip>
+                            <RectangleGeometry Rect="0,0,44,44" RadiusX="10" RadiusY="10" />
+                        </Image.Clip>
+                    </Image>
+
+                    <Grid x:Name="NotifTextHost" Grid.Column="1" Margin="12,0,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock x:Name="NotifTitle" Grid.Row="0"
+                                   Foreground="White" FontFamily="{StaticResource AppFont}"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="NotifBody" Grid.Row="1"
+                                   Foreground="#FFBDBDBD" FontFamily="{StaticResource AppFont}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </Grid>
+
+                <Canvas x:Name="HoverCanvas" IsHitTestVisible="False">
+                    <Border x:Name="HoverName" Visibility="Collapsed"
+                            Background="#F21C1C1E" CornerRadius="7"
+                            BorderBrush="#33FFFFFF" BorderThickness="1" Padding="8,4">
+                        <TextBlock x:Name="HoverNameText" FontFamily="{StaticResource AppFont}"
+                                   FontSize="11" Foreground="#FFEDEDED" />
+                    </Border>
+                </Canvas>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

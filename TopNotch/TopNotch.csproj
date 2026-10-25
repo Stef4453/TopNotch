@@ -1,0 +1,108 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+
+    <Version>1.0 Beta 1</Version>
+    <Product>TopNotch</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Fonts\Inter-Italic-VariableFont_opsz,wght.ttf" />
+    <None Remove="Fonts\Inter-VariableFont_opsz,wght.ttf" />
+    <None Remove="Sprites\audio.png" />
+    <None Remove="Sprites\back.png" />
+    <None Remove="Sprites\Bluetooth.png" />
+    <None Remove="Sprites\bluetooth_audio.png" />
+    <None Remove="Sprites\Empty.png" />
+    <None Remove="Sprites\forward.png" />
+    <None Remove="Sprites\Headphones.png" />
+    <None Remove="Sprites\link.png" />
+    <None Remove="Sprites\lock.png" />
+    <None Remove="Sprites\music_waveform.gif" />
+    <None Remove="Sprites\pause.png" />
+    <None Remove="Sprites\picture.png" />
+    <None Remove="Sprites\play.png" />
+    <None Remove="Sprites\power.png" />
+    <None Remove="Sprites\restart.png" />
+    <None Remove="Sprites\skip.png" />
+    <None Remove="Sprites\sleep.png" />
+    <None Remove="Sprites\SliderPill.png" />
+    <None Remove="Sprites\tray.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="3.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Fonts\OFL.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Fonts\Inter-Italic-VariableFont_opsz,wght.ttf">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Fonts\Inter-VariableFont_opsz,wght.ttf">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\audio.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\back.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\Bluetooth.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\bluetooth_audio.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\Empty.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\forward.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\Headphones.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\link.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\lock.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\music_waveform.gif">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\pause.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\picture.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\play.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\power.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\restart.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\sleep.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\tray.ico">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+  </ItemGroup>
+
+</Project>
