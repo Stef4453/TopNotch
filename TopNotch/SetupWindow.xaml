@@ -156,7 +156,7 @@
             <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
                 <TextBlock Text="Welcome to TopNotch" FontSize="24" FontWeight="SemiBold"
                            Foreground="#FFFFFF" />
-                <TextBlock Text="A notch at the top of the screen. Choose how it looks and behaves; the preview follows along."
+                <TextBlock Text="An interactive widget optimized for productivity. Choose how it looks and behaves."
                            FontSize="12" Foreground="#98989D" TextWrapping="Wrap"
                            Margin="0,4,0,0" />
             </StackPanel>
@@ -321,11 +321,7 @@
                 </Border>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
-                            VerticalAlignment="Bottom" Margin="0,0,14,12" IsHitTestVisible="False">
-                    <Ellipse Width="6" Height="6" Fill="#30D158" VerticalAlignment="Center" />
-                    <TextBlock Text="Live preview" FontSize="10" Foreground="#8E8E93"
-                               Margin="6,0,0,0" />
-                </StackPanel>
+                            VerticalAlignment="Bottom" Margin="0,0,14,12" IsHitTestVisible="False"/>
             </Grid>
         </Border>
 
@@ -339,7 +335,7 @@
                 <TextBlock Text="Shape" Style="{StaticResource SectionHeader}" />
 
                 <StackPanel Orientation="Horizontal">
-                    <RadioButton x:Name="CardNotch" GroupName="Shape" Tag="Notch"
+                    <RadioButton x:Name="CardNotch" GroupName="Shape" Tag="Attached"
                                  AutomationProperties.Name="Notch"
                                  Style="{StaticResource StyleCard}" Checked="Style_Checked">
                         <Grid Width="120" Height="62">
@@ -351,7 +347,7 @@
                         </Grid>
                     </RadioButton>
 
-                    <RadioButton x:Name="CardIsland" GroupName="Shape" Tag="Dynamic Island"
+                    <RadioButton x:Name="CardIsland" GroupName="Shape" Tag="Floating"
                                  AutomationProperties.Name="Dynamic Island"
                                  Style="{StaticResource StyleCard}" Margin="14,0,0,0"
                                  Checked="Style_Checked">

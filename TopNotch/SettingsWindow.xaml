@@ -514,11 +514,11 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,16,0" VerticalAlignment="Center">
                                         <TextBlock Text="Delete all settings" FontSize="13" Foreground="#FFFFFF" />
-                                        <TextBlock Text="Removes every file TopNotch keeps on this PC — preferences, API keys, launchpad shortcuts, pinned files and saved images. The app restarts afterwards."
+                                        <TextBlock Text="Removes every file TopNotch keeps on this PC (preferences, API keys, launchpad shortcuts, pinned files and saved images). The app restarts afterwards."
                                                    FontSize="11" Foreground="#98989D" TextWrapping="Wrap"
                                                    Margin="0,3,0,0" />
                                     </StackPanel>
-                                    <Button x:Name="DeleteSettingsButton" Content="Delete…"
+                                    <Button x:Name="DeleteSettingsButton" Content="Delete"
                                             Style="{StaticResource DangerButton}"
                                             Grid.Column="1" VerticalAlignment="Center"
                                             Click="DeleteSettings_Click" />
