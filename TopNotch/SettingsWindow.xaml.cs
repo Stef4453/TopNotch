@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -20,7 +22,14 @@ namespace TopNotch
         private bool _ready;
 
         private readonly DispatcherTimer _keyTimer = new() { Interval = TimeSpan.FromMilliseconds(700) };
+        private readonly DispatcherTimer _scrollTimer = new(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(15)
+        };
+
         private string _committedKey = string.Empty;
+        private bool _resetting;
+        private double _scrollTarget;
 
         public SettingsWindow()
         {
@@ -56,12 +65,23 @@ namespace TopNotch
                 CommitApiKey();
             };
 
+            _scrollTimer.Tick += (_, _) => StepScroll();
+
+            ContentScroller.PreviewMouseDown += (_, e) =>
+            {
+                if (ScrollBarAt(e.OriginalSource as DependencyObject) is null) return;
+
+                _scrollTimer.Stop();
+                _scrollTarget = ContentScroller.VerticalOffset;
+            };
+
             Closed += (_, _) =>
             {
                 CommitApiKey();
 
                 _sampleTimer.Stop();
                 _keyTimer.Stop();
+                _scrollTimer.Stop();
             };
         }
 
@@ -138,6 +158,7 @@ namespace TopNotch
 
         private void CommitApiKey()
         {
+            if (_resetting) return;
             if (ApiKeyBox.Text.Trim() == _committedKey) return;
 
             Settings.Current.Set(() => Settings.Current.ImgBbApiKey = ApiKeyBox.Text);
@@ -282,6 +303,53 @@ namespace TopNotch
             Settings.Current.Set(() => Settings.Current.HideInFullscreen = FullscreenSwitch.IsChecked == true);
         }
 
+        private void DeleteSettings_Click(object sender, RoutedEventArgs e)
+        {
+            DeleteError.Visibility = Visibility.Collapsed;
+            DeleteIntro.Visibility = Visibility.Collapsed;
+            DeleteConfirm.Visibility = Visibility.Visible;
+        }
+
+        private void CancelDelete_Click(object sender, RoutedEventArgs e)
+        {
+            DeleteConfirm.Visibility = Visibility.Collapsed;
+            DeleteIntro.Visibility = Visibility.Visible;
+        }
+
+        private void ConfirmDelete_Click(object sender, RoutedEventArgs e)
+        {
+            if (_resetting) return;
+
+            _resetting = true;
+            DeleteError.Visibility = Visibility.Collapsed;
+            ConfirmDeleteButton.IsEnabled = false;
+            ConfirmDeleteButton.Content = "Deleting\u2026";
+
+            var app = (App)Application.Current;
+
+            if (!app.DeleteAllData())
+            {
+                FailReset("Some files could not be deleted. Close anything that is using them and try again.");
+                return;
+            }
+
+            _sampleTimer.Stop();
+            _keyTimer.Stop();
+
+            if (app.Restart()) return;
+
+            FailReset("The data was deleted, but TopNotch could not restart. Quit it from the tray and open it again.");
+        }
+
+        private void FailReset(string message)
+        {
+            _resetting = false;
+            ConfirmDeleteButton.IsEnabled = true;
+            ConfirmDeleteButton.Content = "Delete and Restart";
+            DeleteError.Text = message;
+            DeleteError.Visibility = Visibility.Visible;
+        }
+
         private void Search_TextChanged(object sender, TextChangedEventArgs e)
         {
             string query = SearchBox.Text.Trim();
@@ -344,6 +412,51 @@ namespace TopNotch
                     Gather(VisualTreeHelper.GetChild(node, i), into);
                 }
             }
+        }
+
+        private void ContentScroller_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (ContentScroller.ScrollableHeight <= 0) return;
+
+            if (!_scrollTimer.IsEnabled)
+                _scrollTarget = ContentScroller.VerticalOffset;
+
+            _scrollTarget = Math.Clamp(
+                _scrollTarget - e.Delta / 120.0 * 64,
+                0,
+                ContentScroller.ScrollableHeight);
+
+            _scrollTimer.Start();
+            e.Handled = true;
+        }
+
+        private void StepScroll()
+        {
+            double max = ContentScroller.ScrollableHeight;
+            _scrollTarget = Math.Clamp(_scrollTarget, 0, max);
+
+            double current = ContentScroller.VerticalOffset;
+            double remaining = _scrollTarget - current;
+
+            if (Math.Abs(remaining) < 0.4)
+            {
+                ContentScroller.ScrollToVerticalOffset(_scrollTarget);
+                _scrollTimer.Stop();
+                return;
+            }
+
+            ContentScroller.ScrollToVerticalOffset(current + remaining * 0.3);
+        }
+
+        private static ScrollBar? ScrollBarAt(DependencyObject? node)
+        {
+            while (node is not null)
+            {
+                if (node is ScrollBar bar) return bar;
+                node = node is Visual ? VisualTreeHelper.GetParent(node) : null;
+            }
+
+            return null;
         }
     }
 }

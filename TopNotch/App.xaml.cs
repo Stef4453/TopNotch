@@ -1,4 +1,6 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
@@ -23,6 +25,12 @@ namespace TopNotch
             _tray.AddItem("Settings\u2026", () => ShowSettings());
             _tray.AddSeparator();
             _tray.AddItem("Quit", Quit);
+
+            if (Settings.IsFirstRun)
+            {
+                var setup = new SetupWindow();
+                setup.ShowDialog();
+            }
         }
 
         internal void ShowSettings(string? page = null)
@@ -77,6 +85,42 @@ namespace TopNotch
 
         [DllImport("kernel32.dll")]
         private static extern uint GetCurrentThreadId();
+
+        internal bool DeleteAllData()
+        {
+            try
+            {
+                if (Directory.Exists(Settings.Folder)) Directory.Delete(Settings.Folder, true);
+                return true;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        internal bool Restart()
+        {
+            string? path = Environment.ProcessPath;
+            if (path is null) return false;
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(path)
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = AppContext.BaseDirectory
+                });
+            }
+            catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+            {
+                return false;
+            }
+
+            _island?.AllowShutdown();
+            Shutdown();
+            return true;
+        }
 
         private void Quit()
         {

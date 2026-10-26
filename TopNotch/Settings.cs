@@ -31,6 +31,8 @@ namespace TopNotch
 
         public static Settings Current { get; } = Load();
 
+        public static bool IsFirstRun { get; private set; }
+
         public static event Action? Changed;
 
         public static string Folder => Path.Combine(
@@ -133,6 +135,7 @@ namespace TopNotch
         private static Settings Load()
         {
             bool found = File.Exists(FilePath);
+            IsFirstRun = !found;
 
             try
             {

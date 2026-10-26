@@ -129,6 +129,36 @@
             </Setter>
         </Style>
 
+        <Style x:Key="DangerButton" TargetType="Button">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fill" Background="#FF453A" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#FF6961" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Fill" Property="Background" Value="#D70015" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Fill" Property="Background" Value="#5A2A28" />
+                                <Setter Property="Foreground" Value="#C7A3A0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="Switch" TargetType="ToggleButton">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Focusable" Value="False" />
@@ -183,6 +213,70 @@
                                 </Trigger.ExitActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track"
+                                   Orientation="Vertical"
+                                   IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand"
+                                                  Focusable="False"
+                                                  IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                <Border Background="Transparent" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+
+                                <Track.Thumb>
+                                    <Thumb MinHeight="28">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="{x:Type Thumb}">
+                                                <Border x:Name="Bar"
+                                                        Width="6"
+                                                        Margin="0,2"
+                                                        HorizontalAlignment="Center"
+                                                        CornerRadius="3"
+                                                        Background="#48484A" />
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bar" Property="Width" Value="8" />
+                                                        <Setter TargetName="Bar" Property="Background" Value="#5E5E60" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="Bar" Property="Width" Value="8" />
+                                                        <Setter TargetName="Bar" Property="Background" Value="#6E6E70" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand"
+                                                  Focusable="False"
+                                                  IsTabStop="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="{x:Type RepeatButton}">
+                                                <Border Background="Transparent" />
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -311,8 +405,10 @@
                 <Rectangle Height="1" Fill="#3A3A3C" VerticalAlignment="Bottom" />
             </Grid>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer x:Name="ContentScroller" Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          PreviewMouseWheel="ContentScroller_PreviewMouseWheel">
                 <Grid>
                     <StackPanel x:Name="GeneralPane" Margin="22,16,22,8">
                         <TextBlock Text="Time format" Style="{StaticResource SectionHeader}" />
@@ -403,6 +499,50 @@
                                               HorizontalAlignment="Right" VerticalAlignment="Top"
                                               Margin="0,1,0,0"
                                               Checked="Fullscreen_Changed" Unchecked="Fullscreen_Changed" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="Reset" Style="{StaticResource SectionHeader}"
+                                   Margin="0,24,0,8" />
+
+                        <Border Background="#2C2C2E" CornerRadius="9" Padding="14,12">
+                            <Grid>
+                                <Grid x:Name="DeleteIntro">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,16,0" VerticalAlignment="Center">
+                                        <TextBlock Text="Delete all settings" FontSize="13" Foreground="#FFFFFF" />
+                                        <TextBlock Text="Removes every file TopNotch keeps on this PC — preferences, API keys, launchpad shortcuts, pinned files and saved images. The app restarts afterwards."
+                                                   FontSize="11" Foreground="#98989D" TextWrapping="Wrap"
+                                                   Margin="0,3,0,0" />
+                                    </StackPanel>
+                                    <Button x:Name="DeleteSettingsButton" Content="Delete…"
+                                            Style="{StaticResource DangerButton}"
+                                            Grid.Column="1" VerticalAlignment="Center"
+                                            Click="DeleteSettings_Click" />
+                                </Grid>
+
+                                <StackPanel x:Name="DeleteConfirm" Visibility="Collapsed">
+                                    <TextBlock Text="Delete everything and restart?" FontSize="13"
+                                               Foreground="#FFFFFF" />
+                                    <TextBlock Text="This cannot be undone. TopNotch will open again as if it had just been installed."
+                                               FontSize="11" Foreground="#98989D" TextWrapping="Wrap"
+                                               Margin="0,3,0,0" />
+                                    <TextBlock x:Name="DeleteError"
+                                               Text="Some files could not be deleted. Close anything that is using them and try again."
+                                               FontSize="11" Foreground="#FF453A" TextWrapping="Wrap"
+                                               Margin="0,6,0,0" Visibility="Collapsed" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                                Margin="0,10,0,0">
+                                        <Button Content="Cancel" Style="{StaticResource QuietButton}"
+                                                Click="CancelDelete_Click" />
+                                        <Button x:Name="ConfirmDeleteButton" Content="Delete and Restart"
+                                                Style="{StaticResource DangerButton}" Margin="8,0,0,0"
+                                                Click="ConfirmDelete_Click" />
+                                    </StackPanel>
+                                </StackPanel>
                             </Grid>
                         </Border>
                     </StackPanel>
