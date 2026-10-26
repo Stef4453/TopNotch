@@ -9,6 +9,7 @@
 
     <Version>1.0</Version>
     <Product>TopNotch</Product>
+    <ApplicationIcon>Sprites\tray.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,6 +34,10 @@
     <None Remove="Sprites\sleep.png" />
     <None Remove="Sprites\SliderPill.png" />
     <None Remove="Sprites\tray.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Sprites\icon.ico" />
   </ItemGroup>
 
   <ItemGroup>
@@ -98,6 +103,9 @@
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Sprites\sleep.png">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="Sprites\topnotch.png">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </Resource>
     <Resource Include="Sprites\tray.ico">

@@ -149,7 +149,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Image Source="/Sprites/tray.ico" Width="44" Height="44"
+            <Image Source="/Sprites/topnotch.png" Width="44" Height="44"
                    VerticalAlignment="Top"
                    RenderOptions.BitmapScalingMode="HighQuality" />
 
