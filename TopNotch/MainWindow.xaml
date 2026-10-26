@@ -58,7 +58,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Surface" Background="#22FFFFFF" CornerRadius="11">
+                        <Border x:Name="Surface" Background="#00000000" CornerRadius="11">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -509,7 +509,7 @@
                                                 Width="36" Height="30" HorizontalAlignment="Center" VerticalAlignment="Top"
                                                 Tag="Shorten Link"
                                                 MouseEnter="QuickAction_PointerEnter" MouseLeave="QuickAction_PointerLeave"
-                                                Click="ShortenUrl_Click">
+                                                Click="ShortenUrl_Click" BorderBrush="#FF707070">
                                             <Image Source="/Sprites/link.png" Width="22" Height="22" />
                                         </Button>
 
