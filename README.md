@@ -18,3 +18,5 @@ Optimized for lower-end devices. Compatible with Windows 10 and 11.
  - Windows 10 or 11
  - [.NET 10.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-10.0.14-windows-x64-installer)
  - 30MB of free storage
+
+Assisted by OpenCode.
