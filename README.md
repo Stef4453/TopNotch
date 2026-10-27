@@ -1,4 +1,4 @@
-<center>
+<div align="center">
 <img src="https://raw.githubusercontent.com/Stef4453/TopNotch/refs/heads/master/TopNotch/Sprites/topnotch.png" style:width="256" height="256">
 <br>
 <font size="20"><b>TopNotch</b></font>
@@ -6,7 +6,7 @@
 An interactive, non-obtrusive notch for productivity.
 <br>
 Optimized for lower-end devices. Compatible with Windows 10 and 11.
-</center>
+</div>
 
 ## **Features**
 
