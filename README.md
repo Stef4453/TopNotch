@@ -44,6 +44,8 @@ Optimized for lower-end devices. Compatible with Windows 10 and 11.
  - [.NET 10.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/runtime-10.0.14-windows-x64-installer)
  - 30MB of free storage
 
+Images taken on Windows 10 (to demonstrate the program's compatibility). Works just as great on Windows 11.
+<br>
 All images in this document have been uploaded using TopNotch's image sharing function.
 <br>
 <div align="center">© 2026 Stef. Licensed under the MIT License. Assisted by OpenCode.</div>
