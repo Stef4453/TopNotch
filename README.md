@@ -21,7 +21,7 @@ Optimized for lower-end devices. Compatible with Windows 10 and 11.
   <img src="https://i.ibb.co/ynj9cBD3/img8.png"> 
   </div>
 
- - Quick Actions -> System Actions (Shutdown, Restart etc), Link Shortener and Quick Image Sharing (requires an [ImgBB](https://api.imgbb.com) API key)
+ - Quick Actions -> System Actions (Shutdown, Restart etc), Link Shortener and Quick Image Sharing (requires a free (or paid) [ImgBB](https://api.imgbb.com) API key)
  - Usage Information -> View your CPU and RAM usage easily
  <div align="center"><img src="https://i.ibb.co/Fkrs3qXC/img1.png"></div>
  
