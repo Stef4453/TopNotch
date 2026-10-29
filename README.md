@@ -3,7 +3,7 @@
 <br>
 <h1>TopNotch</h1>
 <br>
-An interactive, non-obtrusive notch for productivity.
+An interactive, unobtrusive notch for productivity.
 <br>
 Optimized for lower-end devices. Compatible with Windows 10 and 11.
 </div>
